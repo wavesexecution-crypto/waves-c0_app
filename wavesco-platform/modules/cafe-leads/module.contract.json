@@ -1,0 +1,16 @@
+{
+  "name": "cafe-leads",
+  "displayName": "Cafe Leads",
+  "version": "0.1.0",
+  "description": "Lead capture with AI enrichment (OpenAI gpt-4o-mini) and Telegram alerts.",
+  "entry": "src/index.ts",
+  "requiresEnv": ["OPENAI_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"],
+  "tables": ["CafeLead"],
+  "webhooks": [],
+  "permissions": [
+    { "action": "create", "resource": "cafe-leads/lead" },
+    { "action": "read", "resource": "cafe-leads/lead" }
+  ],
+  "audit": true,
+  "actions": ["createLead", "listLeads"]
+}

@@ -1,0 +1,223 @@
+openapi: 3.1.0
+info:
+  title: WavesCo Platform API
+  version: 1.0.0
+  description: Multi-tenant café operations platform. All endpoints require a session cookie (Auth.js) unless noted.
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /api/auth/callback/credentials:
+    post:
+      summary: Sign in with email + password (Auth.js credentials callback)
+      operationId: authCredentials
+      tags: [auth]
+      responses:
+        "200":
+          description: Redirect to dashboard
+
+  /api/modules/registry:
+    get:
+      summary: List installed modules with per-tenant enable state
+      operationId: listModuleRegistry
+      tags: [modules]
+      responses:
+        "200":
+          description: Module registry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RegistryModule"
+    post:
+      summary: Register an installed module into the catalog
+      operationId: registerModule
+      tags: [modules]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Registered
+        "404":
+          description: Module not installed
+
+  /api/modules/enable:
+    post:
+      summary: Enable a module for the current tenant (validates required env vars)
+      operationId: enableModule
+      tags: [modules]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleNameBody"
+      responses:
+        "200":
+          description: Enabled
+        "500":
+          description: Missing required env vars (loud failure)
+
+  /api/modules/disable:
+    post:
+      summary: Disable a module for the current tenant
+      operationId: disableModule
+      tags: [modules]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleNameBody"
+      responses:
+        "200":
+          description: Disabled
+
+  /api/modules/contract/{name}:
+    get:
+      summary: Get a module's contract JSON
+      operationId: getModuleContract
+      tags: [modules]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Module contract
+        "404":
+          description: Module not installed
+
+  /api/modules/{module}/webhooks/{webhook}:
+    post:
+      summary: Module-owned webhook mount point (handled by the module itself)
+      operationId: moduleWebhook
+      tags: [webhooks]
+      parameters:
+        - name: module
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: webhook
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Target tenant. Also accepted via x-tenant-id header.
+      responses:
+        "200":
+          description: Acknowledged
+        "401":
+          description: Invalid HMAC signature
+        "404":
+          description: Module or webhook not found
+
+  /api/tenant/export:
+    post:
+      summary: Export the current tenant's data as a signed blob (24h token)
+      operationId: exportTenant
+      tags: [tenant]
+      responses:
+        "200":
+          description: Tenant export blob
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantExportBlob"
+
+  /api/tenant/import:
+    post:
+      summary: Import a tenant export blob in a single transaction
+      operationId: importTenant
+      tags: [tenant]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TenantExportBlob"
+      responses:
+        "200":
+          description: Imported
+        "400":
+          description: Invalid blob or token
+
+components:
+  schemas:
+    ModuleNameBody:
+      type: object
+      required: [moduleName]
+      properties:
+        moduleName:
+          type: string
+    RegistryModule:
+      type: object
+      required: [contract, enabled, status]
+      properties:
+        contract:
+          type: object
+        enabled:
+          type: boolean
+        status:
+          type: string
+    TenantExportBlob:
+      type: object
+      required: [dataSchemaVersion, exportedAt, tenant, users, modules, token]
+      properties:
+        dataSchemaVersion:
+          type: integer
+          const: 1
+        exportedAt:
+          type: string
+          format: date-time
+        tenant:
+          type: object
+          required: [id, name, slug, plan, status]
+          properties:
+            id: { type: string }
+            name: { type: string }
+            slug: { type: string }
+            plan: { type: string }
+            status: { type: string }
+        users:
+          type: array
+          items:
+            type: object
+            required: [id, email, role]
+            properties:
+              id: { type: string }
+              email: { type: string, format: email }
+              name: { type: string, nullable: true }
+              role: { type: string }
+        modules:
+          type: array
+          items:
+            type: object
+            required: [moduleId, status]
+            properties:
+              moduleId: { type: string }
+              status: { type: string }
+              config: {}
+        token:
+          type: string
+          description: Signed one-time export token (24h expiry)

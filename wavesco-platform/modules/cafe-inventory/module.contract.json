@@ -1,0 +1,17 @@
+{
+  "name": "cafe-inventory",
+  "displayName": "Cafe Inventory",
+  "version": "0.1.0",
+  "description": "Stock tracking, par levels, low-stock alerts and wastage logging.",
+  "entry": "src/index.ts",
+  "requiresEnv": [],
+  "tables": ["CafeInventoryItem", "CafeStockMovement", "CafeWastageLog"],
+  "webhooks": [],
+  "permissions": [
+    { "action": "create", "resource": "cafe-inventory/item" },
+    { "action": "read", "resource": "cafe-inventory/item" },
+    { "action": "update", "resource": "cafe-inventory/item" }
+  ],
+  "audit": true,
+  "actions": ["createItem", "adjustStock", "logWastage", "listLowStock"]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "cafe-crm",
+  "displayName": "Cafe CRM",
+  "version": "0.1.0",
+  "description": "Customer tags, LTV calculation and WhatsApp re-engagement.",
+  "entry": "src/index.ts",
+  "requiresEnv": ["WHATSAPP_API_KEY", "WHATSAPP_API_URL"],
+  "tables": ["CafeCustomer", "CafeCustomerVisit", "CafeReengagementLog"],
+  "webhooks": [],
+  "permissions": [
+    { "action": "create", "resource": "cafe-crm/customer" },
+    { "action": "read", "resource": "cafe-crm/customer" },
+    { "action": "update", "resource": "cafe-crm/customer" }
+  ],
+  "audit": true,
+  "actions": ["upsertCustomer", "recordVisit", "sendReengagement"]
+}

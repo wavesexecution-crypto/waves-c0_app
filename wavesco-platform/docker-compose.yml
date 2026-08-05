@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16
+    container_name: wavesco-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wavesco
+      POSTGRES_PASSWORD: wavesco
+      POSTGRES_DB: wavesco
+    ports:
+      - "5433:5432"
+    volumes:
+      - wavesco_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wavesco -d wavesco"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  wavesco_pgdata:

@@ -1,0 +1,20 @@
+{
+  "name": "cafe-orders",
+  "displayName": "Cafe Orders",
+  "version": "0.1.0",
+  "description": "Swiggy/Zomato order intake with HMAC-SHA256 webhook verification.",
+  "entry": "src/index.ts",
+  "requiresEnv": ["SWIGGY_SECRET", "ZOMATO_SECRET"],
+  "tables": ["CafeOrder", "CafeReconciliation", "CafeSettlement"],
+  "webhooks": [
+    { "path": "/api/modules/cafe-orders/webhooks/swiggy", "method": "POST", "signature": "hmac-sha256" },
+    { "path": "/api/modules/cafe-orders/webhooks/zomato", "method": "POST", "signature": "hmac-sha256" }
+  ],
+  "permissions": [
+    { "action": "create", "resource": "cafe-orders/order" },
+    { "action": "read", "resource": "cafe-orders/order" },
+    { "action": "update", "resource": "cafe-orders/order" }
+  ],
+  "audit": true,
+  "actions": ["listOrders", "markOrderStatus"]
+}

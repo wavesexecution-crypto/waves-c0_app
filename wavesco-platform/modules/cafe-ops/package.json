@@ -1,0 +1,27 @@
+{
+  "name": "@wavesco/cafe-ops",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./actions": "./src/actions.ts",
+    "./contract": "./module.contract.json"
+  },
+  "dependencies": {
+    "@wavesco/db": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@wavesco/config": "workspace:*",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

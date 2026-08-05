@@ -1,0 +1,344 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+}
+
+// ------------------------------------------------------------------
+// Platform models. Module tables are added by each CafeOS module in
+// Phase 6 (each carries a tenantId column + RLS policy).
+//
+// RLS: the runtime role `wavesco_app` does NOT own these tables, so
+// row-level security (applied in migrations) is enforced for app
+// traffic. `withTenantContext()` sets `SET LOCAL app.tenant_id` inside
+// a transaction; all app queries must run within that context.
+// ------------------------------------------------------------------
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("starter")
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  modules       TenantModule[]
+  idempotency   IdempotencyKey[]
+  refreshTokens RefreshToken[]
+}
+
+model User {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email         String
+  name          String?
+  passwordHash  String?
+  role          String    @default("owner")
+  emailVerified DateTime?
+  status        String    @default("active")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+
+  @@unique([tenantId, email])
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Module {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  displayName  String
+  description  String?
+  version      String
+  contractPath String
+
+  tenants TenantModule[]
+
+  createdAt DateTime @default(now())
+}
+
+model TenantModule {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  moduleId   String
+  module     Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  status     String   @default("enabled")
+  config     Json?
+  enabledAt  DateTime?
+  disabledAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, moduleId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  userId    String?
+  action    String
+  model     String
+  recordId  String?
+  before    Json?
+  after     Json?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([model, recordId])
+  @@index([createdAt])
+}
+
+model IdempotencyKey {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scope     String
+  key       String
+  response  Json?
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@unique([tenantId, scope, key])
+  @@index([expiresAt])
+}
+
+// Auth.js verification tokens (magic link). Auth-level table, not
+// tenant-scoped; permissive RLS is applied by the migration.
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@index([expires])
+}
+
+// ==================================================================
+// CafeOS module tables (Phase 6).
+//
+// Each module declares ownership of its tables in module.contract.json
+// ("tables"). All carry tenantId + RLS policies applied in migrations.
+// ==================================================================
+
+// --- modules/cafe-leads -------------------------------------------------
+model CafeLead {
+  id             String   @id @default(cuid())
+  tenantId       String
+  phone          String
+  name           String?
+  email          String?
+  message        String
+  source         String   @default("website")
+  category       String?
+  priority       String?
+  summary        String?
+  suggestedReply String?
+  alertSent      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, phone])
+}
+
+// --- modules/cafe-orders ------------------------------------------------
+model CafeOrder {
+  id             String   @id @default(cuid())
+  tenantId       String
+  externalOrderId String
+  source         String
+  customerName   String?
+  customerPhone  String?
+  items          Json
+  totalPaise     Int
+  status         String   @default("RECEIVED")
+  placedAt       DateTime
+  dedupHash      String?
+  dupCount       Int      @default(0)
+  rawPayload     Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([tenantId, externalOrderId, source])
+  @@index([tenantId])
+  @@index([tenantId, dedupHash])
+  @@index([tenantId, placedAt])
+}
+
+model CafeReconciliation {
+  id           String   @id @default(cuid())
+  tenantId     String
+  date         DateTime @db.Date
+  source       String
+  totalOrders  Int      @default(0)
+  totalPaise   Int      @default(0)
+  missingOrders Int     @default(0)
+  extraOrders  Int      @default(0)
+  status       String   @default("PENDING")
+  report       Json?
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, date, source])
+  @@index([tenantId])
+}
+
+model CafeSettlement {
+  id          String   @id @default(cuid())
+  tenantId    String
+  source      String
+  periodStart DateTime @db.Date
+  periodEnd   DateTime @db.Date
+  amountPaise Int
+  status      String   @default("PENDING")
+  reference   String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// --- modules/cafe-inventory --------------------------------------------
+model CafeInventoryItem {
+  id               String    @id @default(cuid())
+  tenantId         String
+  name             String
+  sku              String?
+  unit             String    @default("pcs")
+  currentStock     Float     @default(0)
+  parLevel         Float     @default(0)
+  reorderPoint     Float     @default(0)
+  costPaise        Int       @default(0)
+  forecastReorderBy DateTime?
+  forecastQty      Float?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+}
+
+model CafeStockMovement {
+  id        String   @id @default(cuid())
+  tenantId  String
+  itemId    String
+  quantity  Float
+  type      String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([itemId])
+}
+
+model CafeWastageLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  itemId      String
+  quantity    Float
+  reason      String
+  costPaise   Int      @default(0)
+  reportedBy  String?
+  weekStart   DateTime @db.Date
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, weekStart])
+}
+
+// --- modules/cafe-crm ---------------------------------------------------
+model CafeCustomer {
+  id          String    @id @default(cuid())
+  tenantId    String
+  phone       String
+  name        String?
+  email       String?
+  tag         String    @default("NEW")
+  visitCount  Int       @default(0)
+  ltvPaise    Int       @default(0)
+  lastVisitAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+  @@index([tenantId, tag])
+}
+
+model CafeCustomerVisit {
+  id        String   @id @default(cuid())
+  tenantId  String
+  customerId String
+  orderId   String?
+  totalPaise Int     @default(0)
+  visitedAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([customerId])
+}
+
+model CafeReengagementLog {
+  id         String    @id @default(cuid())
+  tenantId   String
+  customerId String
+  phone      String
+  message    String
+  channel    String    @default("whatsapp")
+  status     String    @default("PENDING")
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+// --- modules/cafe-ops ---------------------------------------------------
+model CafeOpsReport {
+  id        String   @id @default(cuid())
+  tenantId  String
+  type      String
+  title     String
+  content   Json
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, type, date])
+}
+
+model CafeOpsSchedule {
+  id         String    @id @default(cuid())
+  tenantId   String
+  reportType String
+  cronExpr   String
+  timezone   String    @default("Asia/Kolkata")
+  isActive   Boolean   @default(true)
+  lastRunAt  DateTime?
+  nextRunAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@unique([tenantId, reportType])
+  @@index([tenantId])
+}

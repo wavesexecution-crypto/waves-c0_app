@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wavesco.dev/schemas/module-contract.schema.json",
+  "title": "WavesCo Module Contract",
+  "description": "Contract every CafeOS module must satisfy. Validated by `pnpm verify:contracts`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "displayName", "version", "description", "entry", "tables", "webhooks", "permissions", "audit"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Machine name, used for the module id. Must match the directory name."
+    },
+    "displayName": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "entry": { "type": "string", "minLength": 1 },
+    "requiresEnv": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Env vars that MUST be set before the module can be enabled. Missing values = loud failure."
+    },
+    "tables": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Prisma model names owned by this module. Each carries a tenant_id column + RLS policy."
+    },
+    "webhooks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "method", "signature"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^/api/modules/[^/]+/webhooks/[^/]+$" },
+          "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+          "signature": {
+            "enum": ["hmac-sha256", "none", "bearer"],
+            "description": "Signature verification strategy for incoming webhooks."
+          }
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "resource"],
+        "properties": {
+          "action": { "enum": ["create", "read", "update", "delete", "admin"] },
+          "resource": { "type": "string" }
+        }
+      }
+    },
+    "audit": { "type": "boolean", "description": "Set false to opt this module's tables out of the auto audit extension." },
+    "actions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Server action names exported by the module."
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "cafe-ops",
+  "displayName": "Cafe Ops",
+  "version": "0.1.0",
+  "description": "Daily briefings and weekly reports aggregated across CafeOS modules.",
+  "entry": "src/index.ts",
+  "requiresEnv": [],
+  "tables": ["CafeOpsReport", "CafeOpsSchedule"],
+  "webhooks": [],
+  "permissions": [
+    { "action": "read", "resource": "cafe-ops/report" },
+    { "action": "create", "resource": "cafe-ops/report" }
+  ],
+  "audit": true,
+  "actions": ["generateDailyBriefing", "generateWeeklyReport"]
+}
