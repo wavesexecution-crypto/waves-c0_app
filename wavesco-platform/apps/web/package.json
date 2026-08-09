@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@next/env": "^15.5.22",
     "@wavesco/auth": "workspace:*",
     "@wavesco/db": "workspace:*",
     "@wavesco/cafe-crm": "workspace:*",

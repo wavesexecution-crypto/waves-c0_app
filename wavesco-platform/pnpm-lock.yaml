@@ -26,6 +26,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@next/env':
+        specifier: ^15.5.22
+        version: 15.5.22
       '@wavesco/auth':
         specifier: workspace:*
         version: link:../../packages/auth

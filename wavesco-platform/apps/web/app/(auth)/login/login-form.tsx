@@ -33,7 +33,11 @@ export function LoginForm() {
     }
 
     const callbackUrl = searchParams.get("callbackUrl");
-    router.push(callbackUrl?.startsWith("/") ? callbackUrl : "/overview");
+    // Only allow same-origin relative paths — reject protocol-relative
+    // (`//host`) and absolute URLs to prevent open redirects.
+    const safeCallbackUrl =
+      callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : null;
+    router.push(safeCallbackUrl ?? "/overview");
     router.refresh();
   }
 

@@ -37,7 +37,13 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  const token = await getToken({ req: request, secret });
+  const token = await getToken({
+    req: request,
+    secret,
+    // Match Auth.js cookie naming: secure cookies are prefixed `__Secure-`
+    // and are used whenever the app is served over HTTPS (i.e. production).
+    secureCookie: request.nextUrl.protocol === "https:",
+  });
   const { pathname } = request.nextUrl;
 
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
