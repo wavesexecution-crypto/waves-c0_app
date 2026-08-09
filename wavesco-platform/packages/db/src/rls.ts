@@ -27,9 +27,12 @@ export async function withTenantContext<T>(
   }
 
   return tenantContext.run({ tenantId: safeTenantId, userId }, () =>
-    prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${safeTenantId}'`);
-      return fn(tx);
-    }),
+    prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${safeTenantId}'`);
+        return fn(tx);
+      },
+      { timeout: 15_000 },
+    ),
   );
 }
