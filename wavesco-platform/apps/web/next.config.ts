@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: false,
   },
   outputFileTracingRoot: process.cwd(),
+  outputFileTracingIncludes: {
+    "/*": ["node_modules/next/dist/compiled/source-map/**/*"],
+  },
 };
 
 export default nextConfig;
