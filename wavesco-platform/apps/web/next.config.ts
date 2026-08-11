@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
+  // The Prisma client is generated into the @wavesco/db workspace package.
+  // Next's serverless tracer must include its query engine binary, which is
+  // resolved lazily at runtime and otherwise gets pruned from the lambda.
+  outputFileTracingIncludes: {
+    "/*": ["../../packages/db/src/generated/client/**/*"],
+  },
 };
 
 export default nextConfig;
