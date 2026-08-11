@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/copy-prisma-engine.mjs",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
@@ -12,16 +12,16 @@
   "dependencies": {
     "@next/env": "^15.5.22",
     "@wavesco/auth": "workspace:*",
-    "@wavesco/db": "workspace:*",
     "@wavesco/cafe-crm": "workspace:*",
     "@wavesco/cafe-inventory": "workspace:*",
     "@wavesco/cafe-leads": "workspace:*",
     "@wavesco/cafe-ops": "workspace:*",
     "@wavesco/cafe-orders": "workspace:*",
+    "@wavesco/db": "workspace:*",
     "@wavesco/ui": "workspace:*",
     "@wavesco/validators": "workspace:*",
-    "lucide-react": "^0.468.0",
     "jose": "^5.9.6",
+    "lucide-react": "^0.468.0",
     "next": "^15.1.6",
     "next-auth": "^5.0.0-beta.25",
     "react": "^19.0.0",
