@@ -1,18 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const PROTECTED_PREFIXES = ["/overview", "/modules", "/billing", "/settings"];
+const PROTECTED_PREFIXES = [
+  "/overview",
+  "/system",
+  "/modules",
+  "/analytics",
+  "/ai",
+  "/activity",
+  "/billing",
+  "/support",
+  "/settings",
+];
 
 function resolveAuthSecret(): string {
-  // Auth.js v5 convention: AUTH_SECRET is the canonical variable.
-  // NEXTAUTH_SECRET is the legacy NextAuth v4 alias — still supported.
   const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
   if (!secret || secret.length < 32) {
-    throw new Error(
-      "AUTH_SECRET (or NEXTAUTH_SECRET) is missing or too short. " +
-        "Set a 32+ character secret in .env. Generate one with: " +
-        "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"",
-    );
+    throw new Error("AUTH_SECRET is missing or too short. Set a 32+ char secret in .env.");
   }
   return secret;
 }
@@ -22,7 +26,6 @@ export async function middleware(request: NextRequest) {
   try {
     secret = resolveAuthSecret();
   } catch (err) {
-    // Surface a clear response instead of a 500 so the user sees the actual fix.
     const message = err instanceof Error ? err.message : "Auth secret not configured.";
     return new NextResponse(
       JSON.stringify({
@@ -37,23 +40,35 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  const token = await getToken({
-    req: request,
-    secret,
-    // Match Auth.js cookie naming: secure cookies are prefixed `__Secure-`
-    // and are used whenever the app is served over HTTPS (i.e. production).
-    secureCookie: request.nextUrl.protocol === "https:",
-  });
+  const token = (await getToken({ req: request, secret })) as unknown as
+    | { tenantId?: string; role?: string }
+    | null;
+
+  const isAuthenticated = typeof token?.tenantId === "string" && token.tenantId.length > 0;
   const { pathname } = request.nextUrl;
 
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-  if (isProtected && !token) {
+  if (isProtected && !isAuthenticated) {
     const loginUrl = new URL("/login", request.nextUrl);
-    loginUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(loginUrl);
+    const callback = pathname + request.nextUrl.search;
+    if (callback !== "/login" && callback !== "/signup" && !callback.startsWith("/login?") && !callback.startsWith("/signup?")) {
+      loginUrl.searchParams.set("callbackUrl", callback);
+    }
+    const res = NextResponse.redirect(loginUrl);
+    // If a stale invalid session cookie exists, clear it to break loops
+    if (token === null && request.cookies.has("authjs.session-token")) {
+      res.cookies.set("authjs.session-token", "", { maxAge: 0, path: "/" });
+      res.cookies.set("__Secure-authjs.session-token", "", { maxAge: 0, path: "/" });
+    }
+    return res;
   }
 
-  if ((pathname === "/login" || pathname === "/signup") && token) {
+  if ((pathname === "/login" || pathname === "/signup") && isAuthenticated) {
+    const callbackUrl = request.nextUrl.searchParams.get("callbackUrl");
+    const isSafeCallback = callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") && callbackUrl !== "/login" && callbackUrl !== "/signup" && !callbackUrl.startsWith("/login?") && !callbackUrl.startsWith("/signup?");
+    if (isSafeCallback) {
+      return NextResponse.redirect(new URL(callbackUrl, request.nextUrl));
+    }
     return NextResponse.redirect(new URL("/overview", request.nextUrl));
   }
 

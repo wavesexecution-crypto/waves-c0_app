@@ -17,6 +17,7 @@ tsconfig.tsbuildinfo
 .env
 .env.local
 .env.*.local
+*.bak
 
 # prisma
 packages/db/generated/

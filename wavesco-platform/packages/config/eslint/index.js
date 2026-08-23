@@ -24,7 +24,6 @@ export function wavescoConfig(options = {}) {
       "**/__generated__/**",
       "**/generated/**",
       "**/*.json",
-      "**/next-env.d.ts",
     ]),
     {
       name: "wavesco/base",

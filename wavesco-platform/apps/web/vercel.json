@@ -1,3 +1,0 @@
-{
-  "buildCommand": "pnpm --filter @wavesco/db db:generate && next build && node scripts/copy-prisma-engine.mjs"
-}

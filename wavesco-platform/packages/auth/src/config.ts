@@ -113,16 +113,13 @@ export const authConfig: NextAuthConfig = {
     jwt({ token, user, trigger }) {
       // Auth.js v5 lifecycle:
       //   sign-in: jwt({ token, user, account, profile })
-      //   requests: jwt({ token })         -> `user` is undefined
+      //   requests: jwt({ token })          -> `user` is undefined
       // Only copy claims from `user` when it is actually present; the token
       // already carries them on every subsequent request.
-      const authUser = user as
-        | { id?: string; tenantId?: string; role?: string }
-        | undefined;
-      if (authUser?.id) {
-        token.id = authUser.id;
-        token.tenantId = authUser.tenantId ?? "";
-        token.role = authUser.role ?? "member";
+      if (user) {
+        token.id = user.id;
+        token.tenantId = user.tenantId;
+        token.role = user.role;
       }
       if (trigger === "update") {
         // Allow server-side session refreshes (tenant data may change).
@@ -131,8 +128,7 @@ export const authConfig: NextAuthConfig = {
     },
     session({ session, token }) {
       const t = token as Record<string, unknown>;
-      const existing = session.user as typeof session.user | undefined;
-      session.user = existing ?? ({} as typeof session.user);
+      session.user = session.user ?? ({} as typeof session.user);
       session.user.id = typeof t.id === "string" ? t.id : "";
       session.user.tenantId = typeof t.tenantId === "string" ? t.tenantId : "";
       session.user.role = typeof t.role === "string" ? t.role : "member";

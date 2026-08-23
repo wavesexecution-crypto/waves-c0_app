@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { requireSession } from "@wavesco/auth";
 import { withTenantContext } from "@wavesco/db";
 import { moduleDisableSchema, moduleEnableSchema } from "@wavesco/validators";
@@ -67,7 +66,6 @@ export async function enableModuleAction(
     user.id,
   );
 
-  revalidatePath("/modules");
   return { ok: true };
 }
 
@@ -93,6 +91,5 @@ export async function disableModuleAction(
     user.id,
   );
 
-  revalidatePath("/modules");
   return { ok: true };
 }
