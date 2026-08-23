@@ -40,7 +40,15 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  const token = (await getToken({ req: request, secret })) as unknown as
+  const token = (await getToken({
+    req: request,
+    secret,
+    // Match Auth.js cookie naming: secure cookies are prefixed `__Secure-`
+    // and are used whenever the app is served over HTTPS (i.e. production).
+    // Without this, getToken reads the non-secure cookie name behind the
+    // proxy and every authenticated page request redirects to /login.
+    secureCookie: request.nextUrl.protocol === "https:",
+  })) as unknown as
     | { tenantId?: string; role?: string }
     | null;
 
