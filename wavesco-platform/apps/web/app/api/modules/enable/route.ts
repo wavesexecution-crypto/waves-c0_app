@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@wavesco/auth";
 import { withTenantContext } from "@wavesco/db";
 import { moduleEnableSchema } from "@wavesco/validators";
 import { auth } from "@/lib/auth";
+import { requireApiUser } from "@/lib/api";
 import { getModule } from "@/lib/module-registry";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const session = await auth();
-  const user = requireSession(session);
+  const { user, response } = requireApiUser(session);
+  if (response) return response;
 
   let body: unknown;
   try {

@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { requireSession } from "@wavesco/auth";
 import { prisma, withTenantContext } from "@wavesco/db";
 import { auth } from "@/lib/auth";
+import { requireApiUser } from "@/lib/api";
 import { buildRegistry } from "@/lib/module-registry";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   const session = await auth();
-  const user = requireSession(session);
+  const { user, response } = requireApiUser(session);
+  if (response) return response;
 
   const registry = buildRegistry();
   const enabled = await withTenantContext(user.tenantId, async (tx) =>
@@ -32,7 +33,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await auth();
-  requireSession(session);
+  const guard = requireApiUser(session);
+  if (guard.response) return guard.response;
 
   let body: { name?: string };
   try {

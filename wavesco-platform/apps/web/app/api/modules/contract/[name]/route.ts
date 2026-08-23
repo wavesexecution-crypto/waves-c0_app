@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@wavesco/auth";
 import { auth } from "@/lib/auth";
+import { requireApiUser } from "@/lib/api";
 import { getModule } from "@/lib/module-registry";
 
 export const runtime = "nodejs";
@@ -11,7 +11,8 @@ interface RouteContext {
 
 export async function GET(_request: Request, ctx: RouteContext) {
   const session = await auth();
-  requireSession(session);
+  const { response } = requireApiUser(session);
+  if (response) return response;
 
   const { name } = await ctx.params;
   const mod = getModule(name);
