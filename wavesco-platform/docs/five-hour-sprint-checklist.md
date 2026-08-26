@@ -5,53 +5,59 @@ CafeOS module, with all checks green.
 
 ## 0. Prereqs (15 min)
 
-- [ ] Node >= 20, pnpm >= 9, Docker Desktop running
-- [ ] `docker compose up -d` (PostgreSQL 16 on :5433)
-- [ ] `pnpm install`
-- [ ] `.env` exists (copy `.env.example`; set `NEXTAUTH_SECRET` + `JWT_SECRET`)
+- [x] Node >= 20, pnpm >= 9, Docker Desktop running
+- [x] `docker compose up -d` (PostgreSQL 16 on :5433)
+- [x] `pnpm install`
+- [x] `.env` exists (copy `.env.example`; set `NEXTAUTH_SECRET` + `JWT_SECRET`)
 
 ## 1. Boot the spine (45 min)
 
-- [ ] `pnpm db:migrate` (creates platform + module tables + RLS)
-- [ ] `pnpm db:seed` (demo@cafe.com / Password123!)
-- [ ] `pnpm dev` → http://localhost:3000
-- [ ] Sign up → land on empty dashboard
-- [ ] Verify JWT contains tenant id (middleware + `requireSession`)
+- [x] `pnpm db:migrate` (creates platform + module tables + RLS)
+- [x] `pnpm db:seed` (demo@cafe.com / Password123!)
+- [x] `pnpm dev` → http://localhost:3000
+- [x] Sign up → land on empty dashboard
+- [x] Verify JWT contains tenant id (middleware + `requireSession`)
 
 ## 2. Gates (30 min)
 
-- [ ] `pnpm typecheck` — zero errors
-- [ ] `pnpm lint` — zero warnings
-- [ ] `pnpm test` — all tests pass
-- [ ] `pnpm verify:contracts` — all module contracts valid
+- [x] `pnpm typecheck` — zero errors
+- [x] `pnpm lint` — zero warnings
+- [x] `pnpm test` — all tests pass
+- [x] `pnpm verify:contracts` — all module contracts valid
 
 ## 3. Enable a module (60 min)
 
 - [ ] Set `OPENAI_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
-- [ ] Modules page → enable **Cafe Leads**
-- [ ] Without the keys → enable fails loudly (expected)
-- [ ] With keys → enable succeeds; `TenantModule` row is `enabled`
+- [x] Modules page → enable **Cafe Leads**
+- [x] Without the keys → enable fails loudly (expected)
+- [x] With keys → enable succeeds; `TenantModule` row is `enabled`
+- [x] Toggle state refreshes in place after enable/disable (`revalidatePath("/modules")`)
 
 ## 4. Webhooks (60 min)
 
-- [ ] Set `SWIGGY_SECRET` + `ZOMATO_SECRET`
+- [x] Set `SWIGGY_SECRET` + `ZOMATO_SECRET`
 - [ ] Enable **Cafe Orders**
-- [ ] `POST /api/modules/cafe-orders/webhooks/swiggy` with HMAC header + `?tenantId=...` → 200
-- [ ] Bad signature → 401
+- [x] `POST /api/modules/cafe-orders/webhooks/swiggy` with HMAC header + `?tenantId=...` → 200
+- [x] Bad signature → 401
+- [x] Dedup: resending the same order increments `dupCount` instead of a new row
+- [x] Fix: module tables were missing GRANTs to `wavesco_app` (RLS policies existed but no table privileges) → added `20260809000000_module_table_grants`
 
 ## 5. Tenant data portability (60 min)
 
-- [ ] `POST /api/tenant/export` → signed blob (24h token)
-- [ ] `POST /api/tenant/import` with the blob → users restored in one transaction
-- [ ] Tampered token → 400
+- [x] `POST /api/tenant/export` → signed blob (24h token)
+- [x] `POST /api/tenant/import` with the blob → users restored in one transaction
+- [x] Tampered token → 400
+- [x] Token bound to tenant: importing another tenant's blob → rejected
 
 ## 6. Audit & UX (30 min)
 
-- [ ] Make a mutation → AuditLog row appears automatically (redacted secrets)
-- [ ] Notification bell shows recent audit activity
-- [ ] Theme toggle flips light/dark
+- [x] Make a mutation → AuditLog row appears automatically (redacted secrets)
+- [x] Notification bell shows recent audit activity
+- [x] Theme toggle flips light/dark
+- [x] Fix: theme now applies before hydration (no-FOUC inline script in root layout)
+- [x] Fix: added `app/icon.svg` to remove the `/favicon.ico` 404
 
 ## 7. Wrap (15 min)
 
-- [ ] `pnpm build` succeeds
+- [x] `pnpm build` succeeds
 - [ ] Update this checklist with what actually took longer

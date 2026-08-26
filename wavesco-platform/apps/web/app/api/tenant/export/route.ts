@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireSession } from "@wavesco/auth";
 import { auth } from "@/lib/auth";
-import { requireApiUser } from "@/lib/api";
 import { buildExportBlob } from "@/lib/tenant-io";
 
 export const runtime = "nodejs";
@@ -11,8 +11,7 @@ export const runtime = "nodejs";
  */
 export async function POST() {
   const session = await auth();
-  const { user, response } = requireApiUser(session);
-  if (response) return response;
+  const user = requireSession(session);
 
   const blob = await buildExportBlob(user.tenantId);
   return NextResponse.json(blob);

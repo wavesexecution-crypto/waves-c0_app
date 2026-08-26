@@ -17,7 +17,6 @@ tsconfig.tsbuildinfo
 .env
 .env.local
 .env.*.local
-*.bak
 
 # prisma
 packages/db/generated/
@@ -40,3 +39,56 @@ Thumbs.db
 # editors
 .idea/
 .vscode/
+
+# local diagnostics / one-off ops scripts (not part of the product)
+scripts/audit-query.cjs
+scripts/query.js
+scripts/debug-db.ts
+scripts/insert-marker.ts
+scripts/temp-verify-user.ts
+scripts/probe-openai.ts
+scripts/check-row20.ts
+scripts/check-conn.ts
+scripts/check-state.ts
+scripts/check-product-tables.ts
+scripts/inspect-all-tenants.ts
+scripts/inspect-tenant-idx.ts
+scripts/inspect-tenants.ts
+scripts/audit-neon-tables.ts
+scripts/cancel-drafts.ts
+scripts/view-orders.ts
+scripts/view-order-errors.ts
+scripts/view-state.ts
+scripts/security-probe.mts
+scripts/smoke-auth-routes.mts
+scripts/test-intelligence-e2e.mts
+scripts/pipeline-e2e.ts
+apps/web/scripts/
+
+# root-level local one-offs
+/audit-query.cjs
+/query.js
+# local diagnostics / one-off ops scripts (not part of the product)
+scripts/audit-query.cjs
+scripts/query.js
+scripts/debug-db.ts
+scripts/insert-marker.ts
+scripts/temp-verify-user.ts
+scripts/probe-openai.ts
+scripts/check-row20.ts
+scripts/check-conn.ts
+scripts/check-state.ts
+scripts/check-product-tables.ts
+scripts/inspect-all-tenants.ts
+scripts/inspect-tenant-idx.ts
+scripts/inspect-tenants.ts
+scripts/audit-neon-tables.ts
+scripts/cancel-drafts.ts
+scripts/view-orders.ts
+scripts/view-order-errors.ts
+scripts/view-state.ts
+scripts/security-probe.mts
+scripts/smoke-auth-routes.mts
+scripts/test-intelligence-e2e.mts
+scripts/pipeline-e2e.ts
+apps/web/scripts/

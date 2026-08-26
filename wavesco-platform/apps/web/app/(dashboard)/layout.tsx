@@ -5,7 +5,7 @@ import { withTenantContext } from "@wavesco/db";
 import { Button } from "@wavesco/ui";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
-import { requireTenantId } from "@/lib/tenant";
+import { hasInternalAccess, requireTenantId } from "@/lib/tenant";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await auth();
@@ -15,18 +15,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     const [tenant, auditLogs] = await Promise.all([
       tx.tenant.findUnique({
         where: { id: tenantId },
-        select: { name: true, plan: true },
+        select: { name: true },
       }),
       tx.auditLog.findMany({
         where: { tenantId },
         orderBy: { createdAt: "desc" },
-        take: 6,
+        take: 5,
         select: { action: true, model: true, createdAt: true },
       }),
     ]);
     return {
       tenantName: tenant?.name ?? "Your workspace",
-      plan: tenant?.plan ?? "starter",
       auditEntries: auditLogs.map((log) => ({
         action: log.action,
         model: log.model,
@@ -41,43 +40,24 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const email = typeof user?.email === "string" ? user.email : "";
 
   return (
-    <div className="flex min-h-screen bg-[#FCFCFD] dark:bg-background">
-      {/* Desktop sidebar — fixed, calm, precise */}
-      <aside className="hidden w-[264px] shrink-0 flex-col border-r border-border/60 bg-card md:flex">
-        <Sidebar plan={data.plan} tenantName={data.tenantName} />
-        <div className="border-t border-border/60 p-3">
+    <div className="flex min-h-screen">
+      <aside className="hidden w-64 flex-col border-r bg-card md:flex">
+        <div className="flex h-14 items-center border-b px-4">
+          <span className="text-base font-semibold tracking-tight">WavesCo</span>
+        </div>
+        <Sidebar internalAccess={hasInternalAccess(session)} />
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar tenantName={data.tenantName} email={email} initials={initials} auditEntries={data.auditEntries} />
+        <main className="flex-1 p-6">{children}</main>
+        <div className="flex h-14 items-center justify-end border-t px-6">
           <form action={signOutAction}>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="submit"
-              className="w-full justify-center text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
+            <Button variant="outline" size="sm" type="submit">
               Sign out
             </Button>
           </form>
         </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar
-          tenantName={data.tenantName}
-          email={email}
-          initials={initials}
-          auditEntries={data.auditEntries}
-          plan={data.plan}
-        />
-        <main className="flex-1">
-          <div className="mx-auto w-full max-w-[1280px] px-4 py-6 md:px-6 md:py-7 lg:px-8">
-            {children}
-          </div>
-        </main>
-        <footer className="border-t border-border/40 px-6 py-4">
-          <div className="mx-auto flex max-w-[1280px] items-center justify-between text-[11px] leading-none tracking-wide text-muted-foreground">
-            <span>© {new Date().getFullYear()} WavesCo · Carefully built for your business.</span>
-            <span className="hidden sm:inline">System status: operational</span>
-          </div>
-        </footer>
       </div>
     </div>
   );

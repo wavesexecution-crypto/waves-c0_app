@@ -104,6 +104,7 @@ export function auditExtension(
         const metadata = { agent: "wavesco-audit" };
 
         try {
+          const afterJson = after === null ? null : JSON.stringify(redact(after));
           await base.$executeRaw`
             SELECT public.audit_log_write(
               ${tenantId}::text,
@@ -111,8 +112,8 @@ export function auditExtension(
               ${operation}::text,
               ${model}::text,
               ${extractRecordId(args)}::text,
-              ${(redact(after) as object)}::jsonb,
-              ${metadata}::jsonb
+              ${afterJson}::text::jsonb,
+              ${JSON.stringify(metadata)}::text::jsonb
             )
           `;
         } catch (err) {

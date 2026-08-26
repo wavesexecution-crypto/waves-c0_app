@@ -33,7 +33,11 @@ export function LoginForm() {
     }
 
     const callbackUrl = searchParams.get("callbackUrl");
-    router.push(callbackUrl?.startsWith("/") ? callbackUrl : "/overview");
+    // Only allow same-origin relative paths — reject protocol-relative
+    // (`//host`) and absolute URLs to prevent open redirects.
+    const safeCallbackUrl =
+      callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : null;
+    router.push(safeCallbackUrl ?? "/overview");
     router.refresh();
   }
 
@@ -43,7 +47,7 @@ export function LoginForm() {
         <label htmlFor="email" className="text-sm font-medium">
           Email
         </label>
-        <Input id="email" name="email" type="email" required placeholder="owner@cafe.com" autoComplete="email" />
+        <Input id="email" name="email" type="email" required placeholder="operator@wavesco.com" autoComplete="email" />
       </div>
       <div className="space-y-1">
         <label htmlFor="password" className="text-sm font-medium">

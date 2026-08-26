@@ -1,0 +1,36 @@
+{
+  "name": "acquisition-os",
+  "displayName": "Acquisition OS",
+  "version": "1.0.0",
+  "description": "Lead Engine control, leads, campaigns, cold email approval handoff, follow-ups and batch reports.",
+  "entry": "app/(dashboard)/acquisition",
+  "requiresEnv": ["LEAD_ENGINE_ROOT", "N8N_BASE_URL"],
+  "tables": ["GenerationBatch", "Campaign", "OutreachEmail", "FollowUp", "ActivityEvent", "LeadResearch", "OutreachOrder"],
+  "webhooks": [],
+  "permissions": [
+    { "action": "read", "resource": "acquisition" },
+    { "action": "create", "resource": "acquisition" },
+    { "action": "update", "resource": "acquisition" },
+    { "action": "delete", "resource": "acquisition" }
+  ],
+  "audit": true,
+  "actions": [
+    "generateLeadsAction",
+    "createCampaignAction",
+    "submitCampaignAction",
+    "decideApprovalAction",
+    "upsertFollowUpAction",
+    "updateLeadOutreachAction",
+    "resendReportAction",
+    "researchLeadAction",
+    "checkLeadEmailAction",
+    "generateOutreachOrderAction",
+    "submitOrderAction",
+    "decideOrderAction",
+    "cancelOrderAction",
+    "batchResearchAction",
+    "batchCheckEmailsAction",
+    "batchGenerateOrdersAction",
+    "batchQueueReadyOrdersAction"
+  ]
+}

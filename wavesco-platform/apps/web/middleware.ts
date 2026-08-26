@@ -10,8 +10,14 @@ const PROTECTED_PREFIXES = [
   "/activity",
   "/billing",
   "/support",
+  "/knowledge",
+  "/command",
+  "/acquisition",
+  "/clients",
+  "/automation",
+  "/intelligence",
   "/settings",
-];
+];;
 
 function resolveAuthSecret(): string {
   const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;

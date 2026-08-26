@@ -15,7 +15,7 @@ export function SignupForm() {
         <label htmlFor="tenantName" className="text-sm font-medium">
           Business name
         </label>
-        <Input id="tenantName" name="tenantName" required placeholder="Acme Cafe" autoComplete="organization" />
+        <Input id="tenantName" name="tenantName" required placeholder="WavesCo HQ" autoComplete="organization" />
       </div>
       <div className="space-y-1">
         <label htmlFor="name" className="text-sm font-medium">
@@ -27,7 +27,7 @@ export function SignupForm() {
         <label htmlFor="email" className="text-sm font-medium">
           Email
         </label>
-        <Input id="email" name="email" type="email" required placeholder="owner@cafe.com" autoComplete="email" />
+        <Input id="email" name="email" type="email" required placeholder="operator@wavesco.com" autoComplete="email" />
       </div>
       <div className="space-y-1">
         <label htmlFor="password" className="text-sm font-medium">

@@ -1,8 +1,0 @@
-{
-  "extends": "@wavesco/config/tsconfig.base.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "types": ["node"]
-  },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
-}

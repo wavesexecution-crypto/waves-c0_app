@@ -10,7 +10,18 @@
     "NEXTAUTH_SECRET",
     "JWT_SECRET",
     "RESEND_API_KEY",
-    "SMTP_FROM"
+    "SMTP_FROM",
+    "N8N_BASE_URL",
+    "N8N_API_KEY",
+    "LEAD_ENGINE_ROOT",
+    "WAVESCO_ENV_PATH",
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "OPENAI_MODEL",
+    "OBSIDIAN_REST_URL",
+    "OBSIDIAN_API_KEY",
+    "LEAD_ENGINE_GATEWAY_TOKEN",
+    "WAVESCO_ENGINE_TENANT"
   ],
   "tasks": {
     "build": {
