@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
+  async redirects() {
+    return [
+      { source: "/acquisition/lead-engine", destination: "/acquisition/generate", permanent: true },
+      { source: "/acquisition/cold-email", destination: "/acquisition/outreach", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

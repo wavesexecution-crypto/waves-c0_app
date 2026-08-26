@@ -47,7 +47,7 @@ export function LoginForm() {
         <label htmlFor="email" className="text-sm font-medium">
           Email
         </label>
-        <Input id="email" name="email" type="email" required placeholder="owner@cafe.com" autoComplete="email" />
+        <Input id="email" name="email" type="email" required placeholder="operator@wavesco.com" autoComplete="email" />
       </div>
       <div className="space-y-1">
         <label htmlFor="password" className="text-sm font-medium">

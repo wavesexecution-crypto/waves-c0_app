@@ -5,7 +5,7 @@ import { withTenantContext } from "@wavesco/db";
 import { Button } from "@wavesco/ui";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
-import { requireTenantId } from "@/lib/tenant";
+import { hasInternalAccess, requireTenantId } from "@/lib/tenant";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await auth();
@@ -45,7 +45,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <div className="flex h-14 items-center border-b px-4">
           <span className="text-base font-semibold tracking-tight">WavesCo</span>
         </div>
-        <Sidebar />
+        <Sidebar internalAccess={hasInternalAccess(session)} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

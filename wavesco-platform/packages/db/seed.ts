@@ -1,54 +1,66 @@
 import { randomUUID } from "node:crypto";
-import { hash } from "bcryptjs";
-import { prisma, withTenantContext, lookupUserByEmail } from "./src";
 
-const DEMO_EMAIL = "demo@cafe.com";
-const DEMO_PASSWORD = "Password123!";
+let prismaRef: { $disconnect(): Promise<void> } | undefined;
 
 async function main(): Promise<void> {
-  const existing = await lookupUserByEmail(DEMO_EMAIL);
+  const email = process.env.OPERATOR_EMAIL;
+  const password = process.env.OPERATOR_PASSWORD;
+
+  if (!email || !password) {
+    console.log(
+      "[seed] OPERATOR_EMAIL / OPERATOR_PASSWORD not set — skipping operator seed. Use scripts/create-tenant.ts to bootstrap a workspace.",
+    );
+    return;
+  }
+
+  const [{ hashPassword }, db] = await Promise.all([
+    import("@wavesco/auth/password"),
+    import("./src/index"),
+  ]);
+  prismaRef = db.prisma;
+  const { lookupUserByEmail, withTenantContext } = db;
+
+  const existing = await lookupUserByEmail(email);
   if (existing) {
-    console.log(`Seed skipped — ${DEMO_EMAIL} already exists (tenant ${existing.tenantId}).`);
+    console.log(`[seed] Operator user ${email} already exists — nothing to do.`);
     return;
   }
 
   const tenantId = `tenant_${randomUUID().replace(/-/g, "")}`;
-  const userId = `user_${randomUUID().replace(/-/g, "")}`;
-  const passwordHash = await hash(DEMO_PASSWORD, 12);
+  const passwordHash = await hashPassword(password);
 
   await withTenantContext(tenantId, async (tx) => {
     await tx.tenant.create({
       data: {
         id: tenantId,
-        name: "Demo Cafe",
-        slug: "demo-cafe",
-        plan: "starter",
+        name: "WavesCo",
+        slug: "wavesco-hq",
+        plan: "operator",
+        status: "active",
       },
     });
-
     await tx.user.create({
       data: {
-        id: userId,
+        id: `user_${randomUUID().replace(/-/g, "")}`,
         tenantId,
-        email: DEMO_EMAIL,
-        name: "Demo Owner",
+        email: email.toLowerCase(),
+        name: "WavesCo Operator",
         passwordHash,
         role: "owner",
+        status: "active",
         emailVerified: new Date(),
       },
     });
   });
 
-  console.log(`Seeded tenant "${tenantId}" with owner ${DEMO_EMAIL}`);
-  console.log(`  login: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
+  console.log(`[seed] Created WavesCo workspace for ${email}.`);
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (err) => {
-    console.error(err);
-    await prisma.$disconnect();
+  .catch((e) => {
+    console.error(e);
     process.exit(1);
+  })
+  .finally(async () => {
+    await prismaRef?.$disconnect();
   });

@@ -32,21 +32,6 @@ importers:
       '@wavesco/auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@wavesco/cafe-crm':
-        specifier: workspace:*
-        version: link:../../modules/cafe-crm
-      '@wavesco/cafe-inventory':
-        specifier: workspace:*
-        version: link:../../modules/cafe-inventory
-      '@wavesco/cafe-leads':
-        specifier: workspace:*
-        version: link:../../modules/cafe-leads
-      '@wavesco/cafe-ops':
-        specifier: workspace:*
-        version: link:../../modules/cafe-ops
-      '@wavesco/cafe-orders':
-        specifier: workspace:*
-        version: link:../../modules/cafe-orders
       '@wavesco/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -105,128 +90,6 @@ importers:
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.19(tsx@4.23.1)
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-
-  modules/cafe-crm:
-    dependencies:
-      '@wavesco/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.20.1
-      '@wavesco/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      eslint:
-        specifier: ^9.17.0
-        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
-
-  modules/cafe-inventory:
-    dependencies:
-      '@wavesco/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.20.1
-      '@wavesco/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      eslint:
-        specifier: ^9.17.0
-        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
-
-  modules/cafe-leads:
-    dependencies:
-      '@wavesco/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.20.1
-      '@wavesco/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      eslint:
-        specifier: ^9.17.0
-        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
-
-  modules/cafe-ops:
-    dependencies:
-      '@wavesco/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.20.1
-      '@wavesco/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      eslint:
-        specifier: ^9.17.0
-        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
-
-  modules/cafe-orders:
-    dependencies:
-      '@wavesco/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.20.1
-      '@wavesco/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      eslint:
-        specifier: ^9.17.0
-        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -2347,6 +2210,7 @@ packages:
   eslint@9.39.5:
     resolution: {integrity: sha512-DgZS62aPLXKlnxILS/AYCoRvHaZeXceIzlXPkkGGzJWSow1aEk0lbTlxUSlyjC8jcaKxAdOnTDz+o1JFSBsyjw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'

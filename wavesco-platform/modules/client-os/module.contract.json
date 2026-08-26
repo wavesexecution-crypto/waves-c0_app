@@ -1,0 +1,25 @@
+{
+  "name": "client-os",
+  "displayName": "Client OS",
+  "version": "1.0.0",
+  "description": "Clients, onboarding checklists, projects, tasks and deliverables.",
+  "entry": "app/(dashboard)/clients",
+  "requiresEnv": [],
+  "tables": ["Client", "OnboardingStep", "Project", "ProjectTask", "Deliverable"],
+  "webhooks": [],
+  "permissions": [
+    { "action": "read", "resource": "clients" },
+    { "action": "create", "resource": "clients" },
+    { "action": "update", "resource": "clients" },
+    { "action": "delete", "resource": "clients" }
+  ],
+  "audit": true,
+  "actions": [
+    "createClientAction",
+    "updateClientAction",
+    "toggleOnboardingStepAction",
+    "createProjectAction",
+    "updateTaskStatusAction",
+    "setDeliverableStatusAction"
+  ]
+}

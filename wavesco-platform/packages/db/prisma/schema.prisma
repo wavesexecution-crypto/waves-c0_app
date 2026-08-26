@@ -139,206 +139,354 @@ model VerificationToken {
 }
 
 // ==================================================================
-// CafeOS module tables (Phase 6).
-//
-// Each module declares ownership of its tables in module.contract.json
-// ("tables"). All carry tenantId + RLS policies applied in migrations.
+// WavesCo product models (2026-08). All carry tenantId + RLS policy
+// applied by migration 20260825010000_wavesco_product_models.
 // ==================================================================
 
-// --- modules/cafe-leads -------------------------------------------------
-model CafeLead {
-  id             String   @id @default(cuid())
-  tenantId       String
-  phone          String
-  name           String?
-  email          String?
-  message        String
-  source         String   @default("website")
-  category       String?
-  priority       String?
-  summary        String?
-  suggestedReply String?
-  alertSent      Boolean  @default(false)
-  createdAt      DateTime @default(now())
+// --- Acquisition OS -----------------------------------------------------
+model GenerationBatch {
+  id              String    @id @default(cuid())
+  tenantId        String
+  requestId       String    @unique
+  params          Json
+  status          String    @default("queued")
+  stage           String?
+  requestedCount  Int?
+  resultLeadCount Int?
+  emailReadyCount Int?
+  engineBatchId   String?
+  pdfPath         String?
+  excelPath       String?
+  logTail         String?
+  error           String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  @@index([tenantId])
-  @@index([tenantId, phone])
+  @@index([tenantId, status])
 }
 
-// --- modules/cafe-orders ------------------------------------------------
-model CafeOrder {
-  id             String   @id @default(cuid())
-  tenantId       String
-  externalOrderId String
-  source         String
-  customerName   String?
-  customerPhone  String?
-  items          Json
-  totalPaise     Int
-  status         String   @default("RECEIVED")
-  placedAt       DateTime
-  dedupHash      String?
-  dupCount       Int      @default(0)
-  rawPayload     Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+model Campaign {
+  id                String    @id @default(cuid())
+  tenantId          String
+  name              String
+  location          String?
+  category          String?
+  tier              String?
+  status            String    @default("draft")
+  sendingLimit      Int?
+  scheduledFor      DateTime?
+  eligibleSnapshot  Json?
+  createdByUserId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  @@unique([tenantId, externalOrderId, source])
-  @@index([tenantId])
-  @@index([tenantId, dedupHash])
-  @@index([tenantId, placedAt])
+  @@index([tenantId, status])
 }
 
-model CafeReconciliation {
-  id           String   @id @default(cuid())
-  tenantId     String
-  date         DateTime @db.Date
-  source       String
-  totalOrders  Int      @default(0)
-  totalPaise   Int      @default(0)
-  missingOrders Int     @default(0)
-  extraOrders  Int      @default(0)
-  status       String   @default("PENDING")
-  report       Json?
-  createdAt    DateTime @default(now())
-
-  @@unique([tenantId, date, source])
-  @@index([tenantId])
-}
-
-model CafeSettlement {
-  id          String   @id @default(cuid())
-  tenantId    String
-  source      String
-  periodStart DateTime @db.Date
-  periodEnd   DateTime @db.Date
-  amountPaise Int
-  status      String   @default("PENDING")
-  reference   String?
-  createdAt   DateTime @default(now())
-
-  @@index([tenantId])
-}
-
-// --- modules/cafe-inventory --------------------------------------------
-model CafeInventoryItem {
-  id               String    @id @default(cuid())
-  tenantId         String
-  name             String
-  sku              String?
-  unit             String    @default("pcs")
-  currentStock     Float     @default(0)
-  parLevel         Float     @default(0)
-  reorderPoint     Float     @default(0)
-  costPaise        Int       @default(0)
-  forecastReorderBy DateTime?
-  forecastQty      Float?
-  isActive         Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  @@unique([tenantId, sku])
-  @@index([tenantId])
-}
-
-model CafeStockMovement {
-  id        String   @id @default(cuid())
-  tenantId  String
-  itemId    String
-  quantity  Float
-  type      String
-  reason    String?
-  createdAt DateTime @default(now())
-
-  @@index([tenantId])
-  @@index([itemId])
-}
-
-model CafeWastageLog {
-  id          String   @id @default(cuid())
-  tenantId    String
-  itemId      String
-  quantity    Float
-  reason      String
-  costPaise   Int      @default(0)
-  reportedBy  String?
-  weekStart   DateTime @db.Date
-  createdAt   DateTime @default(now())
-
-  @@index([tenantId])
-  @@index([tenantId, weekStart])
-}
-
-// --- modules/cafe-crm ---------------------------------------------------
-model CafeCustomer {
+model OutreachEmail {
   id          String    @id @default(cuid())
   tenantId    String
-  phone       String
-  name        String?
-  email       String?
-  tag         String    @default("NEW")
-  visitCount  Int       @default(0)
-  ltvPaise    Int       @default(0)
-  lastVisitAt DateTime?
+  campaignId  String?
+  leadKey     String
+  business    String
+  email       String
+  subject     String
+  body        String
+  status      String    @default("draft")
+  approvalId  String?
+  messageId   String?
+  error       String?
+  submittedAt DateTime?
+  decidedAt   DateTime?
+  sentAt      DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([tenantId, phone])
-  @@index([tenantId])
-  @@index([tenantId, tag])
+  @@index([tenantId, status])
+  @@index([tenantId, campaignId])
+  @@index([tenantId, leadKey])
 }
 
-model CafeCustomerVisit {
-  id        String   @id @default(cuid())
-  tenantId  String
-  customerId String
-  orderId   String?
-  totalPaise Int     @default(0)
-  visitedAt DateTime @default(now())
+model FollowUp {
+  id              String    @id @default(cuid())
+  tenantId        String
+  leadKey         String?
+  business        String
+  dueAt           DateTime
+  status          String    @default("pending")
+  note            String?
+  channel         String    @default("email")
+  campaignId      String?
+  outreachEmailId String?
+  outreachOrderId String?
+  followUpNumber  Int       @default(1) @map("follow_up_number")
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  outreachOrder   OutreachOrder? @relation(fields: [outreachOrderId], references: [id])
 
-  @@index([tenantId])
-  @@index([customerId])
+  @@index([tenantId, status, dueAt])
 }
 
-model CafeReengagementLog {
-  id         String    @id @default(cuid())
+// --- Outreach Order Pipeline (Lead Intelligence → Email Outreach) -------
+// Research snapshot per lead, traceable to the engine corpus. One row per
+// (tenant, leadKey): refreshed in place, never duplicated.
+model LeadResearch {
+  id             String   @id @default(cuid())
+  tenantId       String
+  leadKey        String
+  engineLeadId   Int?
+  business       String
+  category       String?
+  area           String?
+  city           String?
+  website        String?
+  instagram      String?
+  rating         Float?
+  reviews        Int?
+  tier           String?
+  leadScore      Int?
+  digitalPresence String?
+  problem        String?
+  opportunity    String?
+  serviceFit     String?
+  angleSeed      String?
+  contactName    String?
+  contactRole    String?
+  email          String?
+  sourceUrls     Json?
+  verification   String?
+  notes          String?
+  researchedAt   DateTime @default(now())
+  checkedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([tenantId, leadKey])
+  @@index([tenantId, researchedAt])
+}
+
+// Persistent cold-email order for one eligible lead. Lifecycle:
+// READY_FOR_APPROVAL → PENDING → APPROVED → SENT → DELIVERED/FAILED,
+// with REJECTED / CANCELLED terminal states.
+model OutreachOrder {
+  id               String    @id @default(cuid())
+  tenantId         String
+  version          Int       @default(1)
+  leadKey          String
+  engineLeadId     Int?
+  businessName     String
+  contactName      String?
+  contactRole      String?
+  email            String
+  emailStatus      String    @default("VERIFIED")
+  researchSnapshot Json
+  opportunity      String?
+  outreachAngle    String?
+  subject          String
+  body             String
+  followupPlan     Json
+  plannerModel     String?
+  confidence       String    @default("medium")
+  status           String    @default("READY_FOR_APPROVAL")
+  approvalId       String?
+  sendId           String?
+  deliveryStatus   String?
+  replyStatus      String?
+  sendError        String?
+  senderIdentity   String?
+  aiEnabled        Boolean   @default(false) @map("ai_enabled")
+  aiModel          String?   @map("ai_model")
+  enrichmentStatus String?   @map("enrichment_status")
+  selectedService  String?   @map("selected_service")
+  personalizationContext Json? @map("personalization_context")
+  submittedAt      DateTime?
+  decidedAt        DateTime?
+  sentAt           DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  followups         FollowUp[]
+  lifecycleEvents   LeadLifecycleEvent[]
+
+  @@unique([tenantId, leadKey, version])
+  @@index([tenantId, status])
+  @@index([tenantId, email])
+}
+
+// Per-lead lifecycle event for full observability. One row per decision point.
+model LeadLifecycleEvent {
+  id               String   @id @default(cuid())
+  tenantId         String
+  leadKey          String
+  batchId          String?
+  stage            String
+  status           String
+  reason           String?
+  aiEnabled        Boolean  @default(false)
+  aiProvider       String?
+  aiModel          String?
+  enrichmentStatus String?
+  emailStatus      String?
+  eligibility      String?
+  orderId          String?
+  approvalId       String?
+  createdAt        DateTime @default(now())
+
+  outreachOrder OutreachOrder? @relation(fields: [orderId], references: [id])
+
+  @@index([tenantId, leadKey])
+  @@index([tenantId, stage])
+  @@index([tenantId, createdAt])
+  @@index([batchId])
+  @@map("LeadLifecycleEvent")
+}
+
+model ActivityEvent {
+  id         String   @id @default(cuid())
   tenantId   String
-  customerId String
-  phone      String
-  message    String
-  channel    String    @default("whatsapp")
-  status     String    @default("PENDING")
-  sentAt     DateTime?
-  createdAt  DateTime  @default(now())
+  type       String
+  title      String
+  entityType String?
+  entityId   String?
+  href       String?
+  metadata   Json?
+  sourceKey  String?
+  createdAt  DateTime @default(now())
 
-  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, sourceKey])
 }
 
-// --- modules/cafe-ops ---------------------------------------------------
-model CafeOpsReport {
-  id        String   @id @default(cuid())
+// --- Client OS ----------------------------------------------------------
+model Client {
+  id            String   @id @default(cuid())
+  tenantId      String
+  name          String
+  company       String?
+  email         String?
+  phone         String?
+  status        String   @default("lead")
+  notes         String?
+  sourceLeadKey String?
+  ownerUserId   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model OnboardingStep {
+  id        String    @id @default(cuid())
   tenantId  String
-  type      String
+  clientId  String
+  seq       Int
   title     String
-  content   Json
-  date      DateTime @db.Date
-  createdAt DateTime @default(now())
+  done      Boolean   @default(false)
+  doneAt    DateTime?
+  createdAt DateTime  @default(now())
 
-  @@index([tenantId])
-  @@index([tenantId, type, date])
+  @@index([tenantId, clientId])
 }
 
-model CafeOpsSchedule {
-  id         String    @id @default(cuid())
-  tenantId   String
-  reportType String
-  cronExpr   String
-  timezone   String    @default("Asia/Kolkata")
-  isActive   Boolean   @default(true)
-  lastRunAt  DateTime?
-  nextRunAt  DateTime?
-  createdAt  DateTime  @default(now())
+model Project {
+  id          String    @id @default(cuid())
+  tenantId    String
+  clientId    String
+  name        String
+  description String?
+  status      String    @default("planning")
+  startDate   DateTime?
+  dueDate     DateTime?
+  budgetPaise Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  @@unique([tenantId, reportType])
+  @@index([tenantId, clientId])
+}
+
+model ProjectTask {
+  id             String    @id @default(cuid())
+  tenantId       String
+  projectId      String
+  title          String
+  status         String    @default("todo")
+  priority       String    @default("medium")
+  dueDate        DateTime?
+  completedAt    DateTime?
+  assigneeUserId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tenantId, projectId, status])
+}
+
+model Deliverable {
+  id          String    @id @default(cuid())
+  tenantId    String
+  projectId   String
+  title       String
+  type        String?
+  status      String    @default("draft")
+  dueDate     DateTime?
+  deliveredAt DateTime?
+  link        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, projectId, status])
+}
+
+// --- Automation OS ------------------------------------------------------
+model IntegrationStatus {
+  id            String   @id @default(cuid())
+  tenantId      String
+  key           String
+  state         String
+  detail        String?
+  lastCheckedAt DateTime @default(now())
+  lastOkAt      DateTime?
+
+  @@unique([tenantId, key])
+}
+
+// --- Waves AI Gateway ---------------------------------------------------
+// One AI configuration per tenant (current strategy: one client -> one
+// dedicated Ollama account). credentialRef is a REFERENCE (e.g. "env:VAR")
+// resolved server-side; secrets never live in the database.
+model ClientAiConfig {
+  id           String   @id @default(cuid())
+  tenantId     String   @unique
+  aiEnabled    Boolean  @default(false)
+  provider     String   @default("ollama_cloud")
+  baseUrl      String?
+  model        String?
+  credentialRef String?
+  obsidianRoot String?
+  config       Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   @@index([tenantId])
+}
+
+// Per-tenant usage ledger for every gateway call.
+model AiUsageLog {
+  id            String   @id @default(cuid())
+  tenantId      String
+  operation     String
+  provider      String
+  model         String
+  status        String
+  inputTokens   Int?
+  outputTokens  Int?
+  estimatedCostUsd Float?
+  latencyMs     Int?
+  error         String?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, createdAt])
 }

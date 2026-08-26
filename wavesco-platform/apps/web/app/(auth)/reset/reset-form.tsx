@@ -15,7 +15,7 @@ export function ResetForm() {
         <label htmlFor="email" className="text-sm font-medium">
           Email
         </label>
-        <Input id="email" name="email" type="email" required placeholder="owner@cafe.com" autoComplete="email" />
+        <Input id="email" name="email" type="email" required placeholder="operator@wavesco.com" autoComplete="email" />
       </div>
       {state.error ? (
         <p role="alert" className="text-sm font-medium text-destructive">

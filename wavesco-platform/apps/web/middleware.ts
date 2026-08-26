@@ -1,7 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const PROTECTED_PREFIXES = ["/overview", "/modules", "/billing", "/settings"];
+const PROTECTED_PREFIXES = [
+  "/command",
+  "/overview",
+  "/acquisition",
+  "/clients",
+  "/automation",
+  "/intelligence",
+  "/modules",
+  "/billing",
+  "/settings",
+];
 
 function resolveAuthSecret(): string {
   // Auth.js v5 convention: AUTH_SECRET is the canonical variable.
@@ -54,7 +64,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if ((pathname === "/login" || pathname === "/signup") && token) {
-    return NextResponse.redirect(new URL("/overview", request.nextUrl));
+    return NextResponse.redirect(new URL("/command", request.nextUrl));
   }
 
   return NextResponse.next();

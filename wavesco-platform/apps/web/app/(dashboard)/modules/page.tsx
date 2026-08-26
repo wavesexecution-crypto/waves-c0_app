@@ -4,6 +4,7 @@ import { withTenantContext } from "@wavesco/db";
 import { buildRegistry } from "@/lib/module-registry";
 import { ModuleCard } from "@/components/module-card";
 import { requireTenantId } from "@/lib/tenant";
+import { requireInternalAccess } from "@/lib/tenant";
 
 export const metadata: Metadata = {
   title: "Modules",
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 export default async function ModulesPage() {
   const session = await auth();
   const tenantId = requireTenantId(session);
+  requireInternalAccess(session);
 
   const registry = buildRegistry();
   const enabledSet = await withTenantContext(tenantId, async (tx) => {
@@ -29,7 +31,7 @@ export default async function ModulesPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Modules</h1>
         <p className="text-sm text-muted-foreground">
-          Enable CafeOS feature modules. Enabling validates required credentials first — missing keys fail loudly.
+          Enable WavesCo product modules. Enabling validates required configuration first — missing values fail loudly.
         </p>
       </div>
 
