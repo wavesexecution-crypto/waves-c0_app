@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 const PROTECTED_PREFIXES = [
-const PROTECTED_PREFIXES = [
   "/command",
   "/overview",
   "/acquisition",
@@ -19,12 +18,8 @@ const PROTECTED_PREFIXES = [
   "/activity",
   "/support",
 ];
-  "/acquisition",
-  "/clients",
-  "/automation",
-  "/intelligence",
-  "/settings",
-];;
+
+
 
 
 function resolveAuthSecret(): string {

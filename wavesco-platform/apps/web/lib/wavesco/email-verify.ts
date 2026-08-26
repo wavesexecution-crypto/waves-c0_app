@@ -26,12 +26,14 @@ const TIMEOUT_MS = 8_000;
  * MX lookup alone is sufficient for most verification needs.
  */
 export async function verifyEmail(email: string): Promise<VerifyResult> {
+  const raw = email.trim().toLowerCase();
 
   // 1. Format check
   if (!raw || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(raw)) {
     return { valid: false, reason: "invalid email format", mxFound: false, smtpAccepted: false };
   }
 
+  const domain = raw.split("@")[1] ?? "";
 
   // 2. MX lookup
   let mxFound = false;
@@ -39,12 +41,17 @@ export async function verifyEmail(email: string): Promise<VerifyResult> {
   try {
     const records = await new Promise<{ priority: number; exchange: string }[]>((resolve, reject) => {
       resolveMx(domain, (err, addresses) => {
-        if (err) reject(err);
+        if (err) {
+          reject(err instanceof Error ? err : new Error(String(err)));
+          return;
+        }
+        resolve(addresses);
       });
     });
     if (records.length > 0) {
       mxFound = true;
       records.sort((a, b) => a.priority - b.priority);
+      mxHost = records[0]?.exchange ?? mxHost;
     }
   } catch {
     mxFound = false;
@@ -67,6 +74,10 @@ export async function verifyEmail(email: string): Promise<VerifyResult> {
   // SMTP accepted = definitely valid
   // SMTP rejected but MX exists = "risky" but we treat as valid for now
   // (many legitimate mailboxes reject probes)
+  const valid = true;
+  const reason = smtpAccepted
+    ? `MX found (${mxHost}), SMTP accepted`
+    : `MX found (${mxHost}), SMTP probe inconclusive`;
 
   return { valid, reason, mxFound, smtpAccepted };
 }
