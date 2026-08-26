@@ -29,19 +29,19 @@ export interface ActionState {
 // Eligibility preview (read-only; exact counts from real data)
 // ------------------------------------------------------------------
 
-function computeEligibility(params: {
+async function computeEligibility(params: {
   location?: string;
   category?: string;
   tier?: string;
-}): {
+}): Promise<{
   selected: number;
   withEmail: number;
   verified: number;
   previouslyContacted: number;
   optedOut: number;
   eligible: number;
-} {
-  const candidates = selectCampaignCandidates({
+}> {
+  const candidates = await selectCampaignCandidates({
     location: params.location,
     category: params.category,
     tier: params.tier,
@@ -111,11 +111,12 @@ export async function submitCampaignAction(
           return { ok: false as const, error: `This campaign already has ${already} queued emails.` };
         }
 
-        const candidates = selectCampaignCandidates({
+        const allCandidates = await selectCampaignCandidates({
           location: campaign.location ?? undefined,
           category: campaign.category ?? undefined,
           tier: campaign.tier ?? undefined,
-        }).filter(
+        });
+        const candidates = allCandidates.filter(
           (c) =>
             c.email !== null &&
             c.emailVerified &&
@@ -179,7 +180,7 @@ export async function submitCampaignAction(
             },
           });
 
-          updateLeadOutreachState(c.nameKey, { date_contacted: new Date().toISOString() });
+          await updateLeadOutreachState(c.nameKey, { date_contacted: new Date().toISOString() });
 
           if (res.ok) submitted += 1;
           else failedSubmissions += 1;

@@ -37,14 +37,6 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<{ data: T; er
   }
 }
 
-function safeSync<T>(fn: () => T, fallback: T): { data: T; error: string | null } {
-  try {
-    return { data: fn(), error: null };
-  } catch (e) {
-    return { data: fallback, error: e instanceof Error ? e.message : "unavailable" };
-  }
-}
-
 function tierDetail(byTier: Record<string, number>): string {
   const tier = (k: string): number => byTier[k] ?? 0;
   return `Tier A ${tier("A")} · B ${tier("B")} · C ${tier("C")}`;
@@ -56,7 +48,7 @@ export default async function CommandCenterPage() {
   const generatedAt = new Date();
 
   // ---- ACQUISITION (real sources) -------------------------------------
-  const stats = safeSync(() => getLeadStats(), {
+  const stats = await safe(async () => getLeadStats(), {
     total: 0,
     byTier: {},
     newLast7d: 0,
@@ -111,7 +103,7 @@ export default async function CommandCenterPage() {
   // ---- SYSTEMS ----------------------------------------------------------
   const systems = await computeIntegrationStatuses(tenantId);
 
-  const engineRun = safeSync(() => getLastEngineRun(), undefined);
+  const engineRun = await safe(async () => getLastEngineRun(), undefined);
   const schedTask = await safe(() => getScheduledTaskInfo(), null);
 
   // ---- RECENT ACTIVITY --------------------------------------------------
@@ -129,7 +121,7 @@ export default async function CommandCenterPage() {
     }),
   ) as ActivityRow[];
 
-  const manifests = safeSync(() => listBatchManifests().slice(0, 3), []);
+  const manifests = await safe(async () => (await listBatchManifests()).slice(0, 3), []);
   const n8nSystem = systems.find((s) => s.key === "n8n");
 
   return (
@@ -171,7 +163,7 @@ export default async function CommandCenterPage() {
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               <MetricCard label="Total Leads" value={stats.data.total} detail={tierDetail(stats.data.byTier)} href="/acquisition/leads" />
-              <MetricCard label="New (7d)" value={stats.data.newLast7d} detail="discovered this week" href="/acquisition/leads?sort=recent" />
+              <MetricCard label="New (7d)" value={stats.data.newLast7d ?? 0} detail="discovered this week" href="/acquisition/leads?sort=recent" />
               <MetricCard label="Email Ready" value={stats.data.emailReady} detail="verified · uncontacted" href="/acquisition/campaigns" />
               <MetricCard label="Queued Emails" value={platformCounts.pendingApprovals} detail={platformCounts.pendingApprovals === 0 ? "Nothing awaiting approval" : "awaiting approval"} href="/acquisition/outreach" />
               <MetricCard

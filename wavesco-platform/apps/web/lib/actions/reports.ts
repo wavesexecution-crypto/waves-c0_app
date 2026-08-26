@@ -139,7 +139,7 @@ export async function resendReportAction(
   const parsed = resendSchema.safeParse({ batchId: formData.get("batchId") });
   if (!parsed.success) return { ok: false, error: "Invalid batch id." };
 
-  const manifest = getBatchManifest(parsed.data.batchId);
+  const manifest = await getBatchManifest(parsed.data.batchId);
   if (!manifest) return { ok: false, error: "Batch manifest not found on disk." };
 
   const files: { name: string; base64: string }[] = [];

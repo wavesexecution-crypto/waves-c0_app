@@ -21,9 +21,9 @@ export default async function InsightsPage() {
 
   let stats: Awaited<ReturnType<typeof getLeadStats>> | null = null;
   try {
-    stats = getLeadStats();
-    const byTier = getCountsBy("tier");
-    const byCategoryEntries = Object.entries(getCountsBy("category")).sort((a, b) => b[1] - a[1]);
+    stats = await getLeadStats();
+    const byTier = await getCountsBy("tier");
+    const byCategoryEntries = Object.entries(await getCountsBy("category")).sort((a, b) => b[1] - a[1]);
 
     if (stats.emailReady === 0) {
       insights.push({
@@ -97,7 +97,7 @@ export default async function InsightsPage() {
 
   let lastBatch: string | null = null;
   try {
-    const m = listBatchManifests()[0];
+    const m = (await listBatchManifests())[0];
     lastBatch = m ? `${m.batchId} (${m.generatedAt?.slice(0, 10) ?? "?"})` : null;
   } catch {
     // ignore

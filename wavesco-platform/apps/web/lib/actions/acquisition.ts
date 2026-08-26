@@ -145,13 +145,13 @@ export async function updateLeadOutreachAction(
   if (!parsed.success) {
     return { ok: false, error: "Invalid outreach update." };
   }
-  const lead = getLead(parsed.data.nameKey);
+  const lead = await getLead(parsed.data.nameKey);
   if (!lead) {
     return { ok: false, error: "Lead not found in the engine corpus." };
   }
 
   try {
-    updateLeadOutreachState(parsed.data.nameKey, {
+    await updateLeadOutreachState(parsed.data.nameKey, {
       email_status: parsed.data.emailStatus,
       opted_out: parsed.data.optedOut,
       bounced: parsed.data.bounced,

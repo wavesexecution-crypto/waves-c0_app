@@ -1,3 +1,16 @@
+/**
+ * Server-only access layer for the WavesCo Lead Engine.
+ *
+ * DUAL MODE — selected by LEAD_ENGINE_MODE:
+ *   "local"  (default, development): read the engine's SQLite corpus and
+ *            spawn its CLI directly. Requires filesystem access.
+ *   "remote" (production): call the engine's authenticated HTTP API
+ *            (serve.py) via LEAD_ENGINE_API_URL + LEAD_ENGINE_API_TOKEN.
+ *            No filesystem or venv assumptions.
+ *
+ * Every exported function keeps the same signature in both modes so
+ * pages and actions never care which mode is active.
+ */
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
@@ -9,11 +22,66 @@ const execFileAsync = promisify(execFile);
 /** Bindable SQLite value types accepted by node:sqlite. */
 type SqlArg = string | number | bigint | null;
 
+type EngineMode = "local" | "remote";
+
+function mode(): EngineMode {
+  return process.env.LEAD_ENGINE_MODE === "remote" ? "remote" : "local";
+}
+
+export function leadEngineMode(): EngineMode {
+  return mode();
+}
+
+function apiUrl(): string {
+  return (process.env.LEAD_ENGINE_API_URL ?? "").replace(/\/+$/, "");
+}
+
+function apiToken(): string {
+  return process.env.LEAD_ENGINE_API_TOKEN ?? "";
+}
+
+async function apiGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${apiUrl()}${path}`, {
+    headers: { authorization: `Bearer ${apiToken()}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`engine API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return (await res.json()) as T;
+}
+
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${apiUrl()}${path}`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${apiToken()}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`engine API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return (await res.json()) as T;
+}
+
+export class EngineUnavailableError extends Error {
+  constructor(public reason: string) {
+    super(reason);
+  }
+}
+
+/** Non-throwing probe used by callers that need a graceful degraded state. */
+export async function remoteAvailability(): Promise<{ available: boolean; detail: string }> {
+  if (mode() !== "remote") return { available: true, detail: "local mode" };
+  try {
+    const j = await apiGet<{ ok: boolean }>("/health");
+    const healthy = j.ok;
+    return { available: healthy, detail: healthy ? "reachable" : "unhealthy" };
+  } catch (e) {
+    return { available: false, detail: e instanceof Error ? e.message : "unreachable" };
+  }
+}
+
 /**
- * Server-only access layer for the existing WavesCo Lead Engine
- * (D:\wavesco-lead-engine). The engine owns the lead corpus in SQLite;
- * this module READS it live and writes back only outreach state columns.
- * The engine itself is never duplicated here.
+ * Server-only access layer for the existing WavesCo Lead Engine.
+ * The engine owns the lead corpus; this module reads it live and writes
+ * back only outreach state columns. The engine itself is never duplicated.
  */
 
 export function leadEngineRoot(): string {
@@ -67,11 +135,6 @@ export interface EngineLead {
   opportunity: string | null;
   reason: string | null;
   outreach_angle: string | null;
-  wavesco_service: string | null;
-  digital_assessment: string | null;
-  contact_name: string | null;
-  role: string | null;
-  decision_maker: string | null;
   source_urls: string | null;
   verification: string | null;
   site_class: string | null;
@@ -86,12 +149,23 @@ export interface EngineLead {
   batch_id: string | null;
   first_discovered: string | null;
   last_researched: string | null;
+  digital_assessment?: string | null;
+  wavesco_service?: string | null;
+  business_summary?: string | null;
+  personalization_context?: string | null;
+  ai_confidence?: number | null;
+  ai_model?: string | null;
+  contact_name?: string | null;
+  role?: string | null;
+  decision_maker?: string | null;
+  qualification?: string | null;
+  notes?: string | null;
 }
 
 export interface LeadStats {
   total: number;
   byTier: Record<string, number>;
-  newLast7d: number;
+  newLast7d?: number;
   emailReady: number;
   contacted: number;
   optedOut: number;
@@ -100,50 +174,99 @@ export interface LeadStats {
   lastResearchedAt: string | null;
 }
 
-export function getLeadStats(): LeadStats {
+interface ApiStatsResponse {
+  ok: boolean;
+  stats: {
+    total: number;
+    byTier: Record<string, number>;
+    newLast7d: number;
+    emailReady: number;
+    contacted: number;
+    optedOut: number;
+    bounced: number;
+    replies: number;
+  };
+}
+
+interface ApiLeadsResponse {
+  ok: boolean;
+  rows: Record<string, unknown>[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+interface ApiCandidatesResponse {
+  ok: boolean;
+  candidates: {
+    nameKey: string;
+    business: string;
+    email: string | null;
+    emailVerified: boolean;
+    contacted: boolean;
+    optedOut: boolean;
+    bounced: boolean;
+    replied: boolean;
+    tier: string | null;
+    category: string | null;
+    city: string | null;
+  }[];
+}
+
+interface ApiRunResponse {
+  ok: boolean;
+  run: {
+    id: string;
+    batch_id: string | null;
+    status: string | null;
+    added: number | null;
+    discovered: number | null;
+    report_path: string | null;
+    telegram_status: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+  } | null;
+  logTail: string | null;
+}
+
+export async function getLeadStats(): Promise<LeadStats> {
+  if (mode() === "remote") {
+    const j = await apiGet<ApiStatsResponse>("/stats");
+    return { ...j.stats, lastResearchedAt: null };
+  }
   const db = openReadonly();
   try {
     const total = (db.prepare("SELECT count(*) c FROM leads").get() as { c: number }).c;
     const tiers = db
-      .prepare("SELECT tier t, count(*) c FROM leads GROUP BY tier")
+      .prepare("SELECT tier t, count(*) c FROM leads WHERE tier IN ('A','B','C') GROUP BY tier")
       .all() as { t: string | null; c: number }[];
     const byTier: Record<string, number> = {};
-    for (const row of tiers) byTier[row.t ?? "?"] = row.c;
-
-    const scalar = (sql: string): number => {
-      const row = db.prepare(sql).get() as { c: number } | undefined;
-      return row ? row.c : 0;
-    };
-
+    for (const row of tiers) if (row.t) byTier[row.t] = row.c;
+    const one = (sql: string): number =>
+      (db.prepare(sql).get() as { c: number }).c;
+    const last = db
+      .prepare(
+        "SELECT MAX(COALESCE(last_researched, first_discovered)) m FROM leads WHERE last_researched IS NOT NULL OR first_discovered IS NOT NULL",
+      )
+      .get() as { m: string | null };
     return {
       total,
       byTier,
-      newLast7d: scalar(
-        `SELECT count(*) c FROM leads
-         WHERE first_discovered IS NOT NULL
-           AND datetime(first_discovered) >= datetime('now', '-7 days')`,
+      newLast7d: one(
+        "SELECT count(*) FROM leads WHERE COALESCE(first_discovered,last_researched) >= datetime('now','-7 days')",
       ),
-      emailReady: scalar(
-        `SELECT count(*) c FROM leads
-         WHERE email IS NOT NULL AND TRIM(email) <> ''
-           AND UPPER(COALESCE(email_status,'')) LIKE '%VERIFIED%'
-           AND COALESCE(opted_out, 0) = 0
-           AND date_contacted IS NULL`,
+      emailReady: one(
+        "SELECT count(*) FROM leads WHERE email IS NOT NULL AND TRIM(email)<>'' "
+        + "AND UPPER(COALESCE(email_status,'')) LIKE '%VERIFIED%' "
+        + "AND COALESCE(opted_out,0)=0 AND date_contacted IS NULL",
       ),
-      contacted: scalar("SELECT count(*) c FROM leads WHERE date_contacted IS NOT NULL"),
-      optedOut: scalar("SELECT count(*) c FROM leads WHERE COALESCE(opted_out,0) = 1"),
-      bounced: scalar("SELECT count(*) c FROM leads WHERE COALESCE(bounced,0) = 1"),
-      replies: scalar(
-        `SELECT count(*) c FROM leads
-         WHERE reply_status IS NOT NULL AND TRIM(reply_status) <> ''
-           AND LOWER(reply_status) NOT IN ('none','no reply','no')`,
+      contacted: one("SELECT count(*) FROM leads WHERE date_contacted IS NOT NULL"),
+      optedOut: one("SELECT count(*) FROM leads WHERE COALESCE(opted_out,0)=1"),
+      bounced: one("SELECT count(*) FROM leads WHERE COALESCE(bounced,0)=1"),
+      replies: one(
+        "SELECT count(*) FROM leads WHERE reply_status IS NOT NULL AND TRIM(reply_status)<>''",
       ),
-      lastResearchedAt: (() => {
-        const row = db
-          .prepare("SELECT MAX(last_researched) m FROM leads WHERE last_researched IS NOT NULL")
-          .get() as { m: string | null } | undefined;
-        return row ? (row.m ?? null) : null;
-      })(),
+      lastResearchedAt: last.m,
     };
   } finally {
     db.close();
@@ -170,18 +293,30 @@ export interface ListLeadsResult {
   pageSize: number;
 }
 
-export function listLeads(params: ListLeadsParams): ListLeadsResult {
+export async function listLeads(params: ListLeadsParams): Promise<ListLeadsResult> {
+  if (mode() === "remote") {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") q.set(k, String(v));
+    }
+    const j = await apiGet<ApiLeadsResponse>(`/leads?${q.toString()}`);
+    return {
+      rows: j.rows as unknown as EngineLead[],
+      total: j.total,
+      page: j.page,
+      pageSize: j.pageSize,
+    };
+  }
   const db = openReadonly();
   try {
-  const where: string[] = [];
-  const args: SqlArg[] = [];
-
+    const where: string[] = [];
+    const args: SqlArg[] = [];
     if (params.search) {
       where.push(
         "(LOWER(business) LIKE ? OR LOWER(COALESCE(area,'')) LIKE ? OR LOWER(COALESCE(email,'')) LIKE ? OR phone LIKE ?)",
       );
-      const q = `%${params.search.toLowerCase()}%`;
-      args.push(q, q, q, q);
+      const like = `%${params.search.toLowerCase()}%`;
+      args.push(like, like, like, like);
     }
     if (params.tier && params.tier !== "all") {
       where.push("tier = ?");
@@ -195,9 +330,9 @@ export function listLeads(params: ListLeadsParams): ListLeadsResult {
       where.push("city = ?");
       args.push(params.city);
     }
-    if (params.verification && params.verification !== "all") {
-      where.push("UPPER(COALESCE(verification,'')) LIKE ?");
-      args.push(`%${params.verification.toUpperCase()}%`);
+    if (params.emailStatus && params.emailStatus !== "all") {
+      where.push("UPPER(COALESCE(email_status,'')) LIKE ?");
+      args.push(`%${params.emailStatus.toUpperCase()}%`);
     }
     switch (params.outreach) {
       case "contacted":
@@ -210,53 +345,43 @@ export function listLeads(params: ListLeadsParams): ListLeadsResult {
         where.push("COALESCE(opted_out,0) = 1");
         break;
       case "replied":
-        where.push(
-          "reply_status IS NOT NULL AND TRIM(reply_status) <> '' AND LOWER(reply_status) NOT IN ('none','no reply','no')",
-        );
+        where.push("reply_status IS NOT NULL AND TRIM(reply_status) <> ''");
         break;
       default:
         break;
     }
-
-    const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const wsql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
     const orderSql =
       params.sort === "recent"
         ? "ORDER BY COALESCE(last_researched, first_discovered) DESC"
         : params.sort === "business"
           ? "ORDER BY business ASC"
           : "ORDER BY COALESCE(lead_score, 0) DESC";
-
     const pageSize = Math.min(Math.max(params.pageSize ?? 25, 5), 100);
     const page = Math.max(params.page ?? 1, 1);
     const offset = (page - 1) * pageSize;
-
-    const total = (db.prepare(`SELECT count(*) c FROM leads ${whereSql}`).get(...args) as { c: number })
-      .c;
+    const total = (
+      db.prepare(`SELECT count(*) c FROM leads ${wsql}`).get(...args) as { c: number }
+    ).c;
     const rows = db
-      .prepare(
-        `SELECT * FROM leads ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
-      )
+      .prepare(`SELECT * FROM leads ${wsql} ${orderSql} LIMIT ? OFFSET ?`)
       .all(...args, pageSize, offset) as unknown as EngineLead[];
-
     return { rows, total, page, pageSize };
   } finally {
     db.close();
   }
 }
 
-export function getLead(nameKey: string): EngineLead | undefined {
-  const db = openReadonly();
-  try {
-    return db.prepare("SELECT * FROM leads WHERE name_key = ?").get(nameKey) as
-      | EngineLead
-      | undefined;
-  } finally {
-    db.close();
-  }
+export async function getLead(nameKey: string): Promise<EngineLead | undefined> {
+  const res = await listLeads({ search: nameKey, page: 1, pageSize: 5 });
+  return res.rows.find((r) => r.name_key === nameKey);
 }
 
-/** Distinct categories/cities present in the corpus (for filters). */
-export function getFacets(): { categories: string[]; cities: string[] } {
+export async function getFacets(): Promise<{ categories: string[]; cities: string[] }> {
+  if (mode() === "remote") {
+    const j = await apiGet<{ ok: boolean; categories: string[]; cities: string[] }>("/facets");
+    return { categories: j.categories, cities: j.cities };
+  }
   const db = openReadonly();
   try {
     const cats = db
@@ -265,17 +390,19 @@ export function getFacets(): { categories: string[]; cities: string[] } {
     const cities = db
       .prepare("SELECT DISTINCT city c FROM leads WHERE city IS NOT NULL ORDER BY c")
       .all() as { c: string }[];
-    return {
-      categories: cats.map((r) => r.c),
-      cities: cities.map((r) => r.c),
-    };
+    return { categories: cats.map((r) => r.c), cities: cities.map((r) => r.c) };
   } finally {
     db.close();
   }
 }
 
-/** Safe GROUP BY counts for whitelisted columns (for analytics). */
-export function getCountsBy(column: "category" | "city" | "tier"): Record<string, number> {
+export async function getCountsBy(column: "category" | "city" | "tier"): Promise<Record<string, number>> {
+  if (mode() === "remote") {
+    const j = await apiGet<{ ok: boolean; counts: Record<string, number> }>(
+      `/groupby?column=${column}`,
+    );
+    return j.counts;
+  }
   const allowed = { category: "category", city: "city", tier: "tier" } as const;
   const col = allowed[column];
   const db = openReadonly();
@@ -288,6 +415,143 @@ export function getCountsBy(column: "category" | "city" | "tier"): Record<string
     db.close();
   }
 }
+
+export async function updateLeadOutreachState(
+  nameKey: string,
+  fields: {
+    email_status?: string;
+    date_contacted?: string | null;
+    reply_status?: string | null;
+    opted_out?: boolean;
+    bounced?: boolean;
+    next_follow_up?: string | null;
+  },
+): Promise<void> {
+  if (mode() === "remote") {
+    await apiPost("/outreach", { nameKey, fields });
+    return;
+  }
+  const sets: string[] = [];
+  const args: SqlArg[] = [];
+  for (const [k, v] of Object.entries(fields)) {
+    
+    sets.push(`${k} = ?`);
+    args.push(v as SqlArg);
+  }
+  if (sets.length === 0) return;
+  const db = openWritable();
+  try {
+    db.prepare(`UPDATE leads SET ${sets.join(", ")} WHERE name_key = ?`).run(...args, nameKey);
+  } finally {
+    db.close();
+  }
+}
+
+export interface BatchManifest {
+  batchId: string;
+  generatedAt?: string;
+  leadCount?: number;
+  emailReadyCount?: number;
+  pdfPath?: string;
+  excelPath?: string;
+  telegramDeliveryStatus?: string;
+  [k: string]: unknown;
+}
+
+export async function listBatchManifests(): Promise<BatchManifest[]> {
+  if (mode() === "remote") {
+    const j = await apiGet<{ ok: boolean; manifests: BatchManifest[] }>("/manifests");
+    return j.manifests.map((m) => ({
+      batchId: m.batchId,
+      generatedAt: m.generatedAt,
+      leadCount: m.leadCount,
+      emailReadyCount: m.emailReadyCount,
+      pdfPath: m.pdfPath,
+      excelPath: m.excelPath,
+      telegramDeliveryStatus: m.telegramDeliveryStatus,
+    }));
+  }
+  const dir = runsDir();
+  if (!existsSync(dir)) return [];
+  const out: BatchManifest[] = [];
+  for (const entry of readdirSync(dir)) {
+    if (!entry.endsWith(".json")) continue;
+    try {
+      out.push(JSON.parse(readFileSync(join(dir, entry), "utf8")) as BatchManifest);
+    } catch {
+      // unreadable manifest — skip
+    }
+  }
+  out.sort((a, b) => (b.generatedAt ?? "").localeCompare(a.generatedAt ?? ""));
+  return out;
+}
+
+export async function getBatchManifest(batchId: string): Promise<BatchManifest | undefined> {
+  const all = await listBatchManifests();
+  return all.find((m) => m.batchId === batchId);
+}
+
+/** Streams a report file from the engine host. Remote mode only —
+ * local mode reads the filesystem directly via the reports file route. */
+export async function fetchManifestFile(
+  batchId: string,
+  type: "pdf" | "xlsx" | "excel",
+): Promise<{ ok: true; body: ArrayBuffer; contentType: string; filename: string } | { ok: false; error: string }> {
+  const res = await fetch(
+    `${apiUrl()}/manifests/${encodeURIComponent(batchId)}/file?type=${type}`,
+    { headers: { authorization: `Bearer ${apiToken()}` }, cache: "no-store" },
+  );
+  if (!res.ok) {
+    return { ok: false, error: `engine file fetch ${res.status}` };
+  }
+  const cd = res.headers.get("content-disposition") ?? "";
+  const m = /filename="?([^";]+)"?/.exec(cd);
+  return {
+    ok: true,
+    body: await res.arrayBuffer(),
+    contentType: res.headers.get("content-type") ?? "application/octet-stream",
+    filename: m?.[1] ?? `${batchId}.${type}`,
+  };
+}
+
+export interface ScheduledTaskInfo {
+  taskName: string;
+  state: string;
+  nextRunTime: string | null;
+  lastRunTime: string | null;
+  lastResult: string | null;
+}
+
+export async function getScheduledTaskInfo(): Promise<ScheduledTaskInfo | null> {
+  // Windows Task Scheduler is a local-machine concept; in remote mode the
+  // engine host's scheduler is not observable from here.
+  if (mode() === "remote") return null;
+  if (schedCache && Date.now() - schedCache.at < 30_000) return schedCache.data;
+  try {
+    const { stdout } = await execFileAsync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        `$t = Get-ScheduledTask -TaskName 'WavesCo Lead Engine' -ErrorAction Stop; `
+        + `$i = $t | Get-ScheduledTaskInfo; `
+        + `[pscustomobject]@{ state = $t.State; `
+        + `nextRunTime = $(if ($i.NextRunTime) { ([datetime]$i.NextRunTime).ToString('yyyy-MM-dd HH:mm') } else { $null }); `
+        + `lastRunTime = $(if ($i.LastRunTime) { ([datetime]$i.LastRunTime).ToString('yyyy-MM-dd HH:mm') } else { $null }); `
+        + `lastResult = [string]$i.LastTaskResult } | ConvertTo-Json -Compress`,
+      ],
+      { timeout: 10_000 },
+    );
+    const parsed = JSON.parse(stdout) as Omit<ScheduledTaskInfo, "taskName">;
+    schedCache = { at: Date.now(), data: { taskName: "WavesCo Lead Engine", ...parsed } };
+    return schedCache.data;
+  } catch {
+    schedCache = { at: Date.now(), data: null };
+    return null;
+  }
+}
+
+let schedCache: { at: number; data: ScheduledTaskInfo | null } | null = null;
 
 // ------------------------------------------------------------------
 // Campaign audience selection (reads the REAL corpus)
@@ -313,11 +577,17 @@ export interface CandidateFilters {
   tier?: string;
 }
 
-/**
- * Returns every corpus lead matching the segment filter with its
- * outreach state so the UI can compute exact eligibility counts.
- */
-export function selectCampaignCandidates(filters: CandidateFilters): CampaignCandidate[] {
+export async function selectCampaignCandidates(
+  filters: CandidateFilters,
+): Promise<CampaignCandidate[]> {
+  if (mode() === "remote") {
+    const q = new URLSearchParams();
+    if (filters.location) q.set("location", filters.location);
+    if (filters.category) q.set("category", filters.category);
+    if (filters.tier) q.set("tier", filters.tier);
+    const j = await apiGet<ApiCandidatesResponse>(`/candidates?${q.toString()}`);
+    return j.candidates;
+  }
   const db = openReadonly();
   try {
     const where: string[] = [];
@@ -334,42 +604,31 @@ export function selectCampaignCandidates(filters: CandidateFilters): CampaignCan
       where.push("tier = ?");
       args.push(filters.tier);
     }
-    const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
-    return (
-      db
-        .prepare(
-          `SELECT name_key, business, email,
-                  CASE WHEN UPPER(COALESCE(email_status,'')) LIKE '%VERIFIED%' THEN 1 ELSE 0 END AS emailVerified,
-                  CASE WHEN date_contacted IS NOT NULL THEN 1 ELSE 0 END AS contacted,
-                  COALESCE(opted_out,0) AS optedOut,
-                  COALESCE(bounced,0) AS bounced,
-                  CASE WHEN reply_status IS NOT NULL AND TRIM(reply_status) <> ''
-                        AND LOWER(reply_status) NOT IN ('none','no reply','no') THEN 1 ELSE 0 END AS replied,
-                  tier, category, city
-           FROM leads ${whereSql} ORDER BY COALESCE(lead_score,0) DESC`,
-        )
-        .all(...args) as unknown as {
-        name_key: string;
-        business: string;
-        email: string | null;
-        emailVerified: number;
-        contacted: number;
-        optedOut: number;
-        bounced: number;
-        replied: number;
-        tier: string | null;
-        category: string | null;
-        city: string | null;
-      }[]
-    ).map((r) => ({
+    const wsql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT name_key,business,email,
+           CASE WHEN UPPER(COALESCE(email_status,'')) LIKE '%VERIFIED%' THEN 1 ELSE 0 END AS verified,
+           CASE WHEN date_contacted IS NOT NULL THEN 1 ELSE 0 END AS contacted,
+           COALESCE(opted_out,0) AS opted_out,
+           COALESCE(bounced,0) AS bounced,
+           CASE WHEN reply_status IS NOT NULL AND TRIM(reply_status)<>'' 
+                AND LOWER(reply_status) NOT IN ('none','no reply','no') THEN 1 ELSE 0 END AS replied,
+           tier,category,city
+         FROM leads ${wsql} ORDER BY COALESCE(lead_score,0) DESC`,
+      )
+      .all(...args) as { name_key: string; business: string; email: string | null;
+        verified: number; contacted: number; opted_out: number; bounced: number;
+        replied: number; tier: string | null; category: string | null; city: string | null }[];
+    return rows.map((r) => ({
       nameKey: r.name_key,
       business: r.business,
-      email: r.email && r.email.trim() !== "" ? r.email : null,
-      emailVerified: r.emailVerified === 1,
-      contacted: r.contacted === 1,
-      optedOut: r.optedOut === 1,
-      bounced: r.bounced === 1,
-      replied: r.replied === 1,
+      email: r.email ?? null,
+      emailVerified: !!r.verified,
+      contacted: !!r.contacted,
+      optedOut: !!r.opted_out,
+      bounced: !!r.bounced,
+      replied: !!r.replied,
       tier: r.tier,
       category: r.category,
       city: r.city,
@@ -379,160 +638,70 @@ export function selectCampaignCandidates(filters: CandidateFilters): CampaignCan
   }
 }
 
-/**
- * Writes back ONLY outreach-state columns to the engine DB so PDF/Excel
- exports and dedupe stay consistent with what the operator did here.
- */
-export function updateLeadOutreachState(
-  nameKey: string,
-  fields: {
-    email_status?: string;
-    date_contacted?: string | null;
-    reply_status?: string | null;
-    opted_out?: boolean;
-    bounced?: boolean;
-    next_follow_up?: string | null;
-  },
-): void {
-  const sets: string[] = [];
-  const args: SqlArg[] = [];
-  if (fields.email_status !== undefined) {
-    sets.push("email_status = ?");
-    args.push(fields.email_status);
-  }
-  if (fields.date_contacted !== undefined) {
-    sets.push("date_contacted = ?");
-    args.push(fields.date_contacted);
-  }
-  if (fields.reply_status !== undefined) {
-    sets.push("reply_status = ?");
-    args.push(fields.reply_status);
-  }
-  if (fields.opted_out !== undefined) {
-    sets.push("opted_out = ?");
-    args.push(fields.opted_out ? 1 : 0);
-  }
-  if (fields.bounced !== undefined) {
-    sets.push("bounced = ?");
-    args.push(fields.bounced ? 1 : 0);
-  }
-  if (fields.next_follow_up !== undefined) {
-    sets.push("next_follow_up = ?");
-    args.push(fields.next_follow_up);
-  }
-  if (sets.length === 0) return;
-
-  const db = openWritable();
-  try {
-    db.prepare(`UPDATE leads SET ${sets.join(", ")} WHERE name_key = ?`).run(...args, nameKey);
-  } finally {
-    db.close();
-  }
-}
-
 // ------------------------------------------------------------------
-// Batch manifests + reports on disk
-// ------------------------------------------------------------------
-
-export interface BatchManifest {
-  batchId: string;
-  generatedAt?: string;
-  leadCount?: number;
-  emailReadyCount?: number;
-  pdfPath?: string;
-  excelPath?: string;
-  telegramDeliveryStatus?: string;
-  [k: string]: unknown;
-}
-
-export function listBatchManifests(): BatchManifest[] {
-  const dir = runsDir();
-  if (!existsSync(dir)) return [];
-  const out: BatchManifest[] = [];
-  for (const entry of readdirSync(dir)) {
-    if (!entry.endsWith(".json")) continue;
-    try {
-      const raw = JSON.parse(readFileSync(join(dir, entry), "utf8")) as BatchManifest;
-      out.push(raw);
-    } catch {
-      // unreadable manifest — skip
-    }
-  }
-  out.sort((a, b) => (b.generatedAt ?? "").localeCompare(a.generatedAt ?? ""));
-  return out;
-}
-
-export function getBatchManifest(batchId: string): BatchManifest | undefined {
-  return listBatchManifests().find((m) => m.batchId === batchId);
-}
-
-// ------------------------------------------------------------------
-// Generation runs (spawns the REAL engine CLI)
+// Generation runs (local: spawn CLI · remote: POST to engine API)
 // ------------------------------------------------------------------
 
 export interface LastRunInfo {
-  started_at: string | null;
-  finished_at: string | null;
-  discovered: number | null;
+  id: string;
+  batch_id: string | null;
+  status: string | null;
   added: number | null;
+  discovered: number | null;
   report_path: string | null;
   telegram_status: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  log_tail?: string | null;
 }
 
-export function getLastEngineRun(): LastRunInfo | undefined {
+export async function getLastEngineRun(): Promise<LastRunInfo | undefined> {
+  if (mode() === "remote") {
+    const j = await apiGet<ApiRunResponse>("/runs/latest");
+    if (!j.run) return undefined;
+    return {
+      id: j.run.id,
+      batch_id: j.run.batch_id,
+      status: j.run.status,
+      added: j.run.added,
+      discovered: j.run.discovered,
+      report_path: j.run.report_path,
+      telegram_status: j.run.telegram_status,
+      started_at: j.run.started_at,
+      finished_at: j.run.finished_at,
+      log_tail: j.logTail,
+    };
+  }
   const db = openReadonly();
   try {
-    return db
-      .prepare("SELECT started_at, finished_at, discovered, added, report_path, telegram_status FROM runs ORDER BY started_at DESC LIMIT 1")
+    const row = db
+      .prepare(
+        "SELECT id,batch_id,status,added,discovered,report_path,telegram_status,"
+        + "started_at,finished_at FROM runs ORDER BY started_at DESC LIMIT 1",
+      )
       .get() as LastRunInfo | undefined;
+    return row;
   } finally {
     db.close();
   }
 }
 
-interface ScheduledTaskInfo {
-  taskName: string;
-  state: string;
-  nextRunTime: string | null;
-  lastRunTime: string | null;
-  lastResult: string | null;
+export interface StartGenerationResult {
+  started: boolean;
+  error?: string;
 }
 
-let schedCache: { at: number; data: ScheduledTaskInfo | null } | null = null;
-
-/** Reads the real Windows Task Scheduler entry that drives the engine. */
-export async function getScheduledTaskInfo(): Promise<ScheduledTaskInfo | null> {
-  if (schedCache && Date.now() - schedCache.at < 30_000) return schedCache.data;
+export async function startGenerationRemote(
+  requestedCount: number,
+): Promise<StartGenerationResult> {
   try {
-    const { stdout } = await execFileAsync(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        "-Command",
-        `$t = Get-ScheduledTask -TaskName 'WavesCo Lead Engine' -ErrorAction Stop; $i = $t | Get-ScheduledTaskInfo; [pscustomobject]@{ state = [string]$t.State; nextRunTime = $(if ($i.NextRunTime) { ([datetime]$i.NextRunTime).ToString('yyyy-MM-dd HH:mm') } else { $null }); lastRunTime = $(if ($i.LastRunTime) { ([datetime]$i.LastRunTime).ToString('yyyy-MM-dd HH:mm') } else { $null }); lastResult = [string]$i.LastTaskResult } | ConvertTo-Json -Compress`,
-      ],
-      { timeout: 10_000 },
+    const j = await apiPost<{ ok: boolean; message?: string; error?: string }>(
+      "/generate",
+      { requestedCount },
     );
-    const parsed = JSON.parse(stdout) as {
-      state?: string;
-      nextRunTime?: string | null;
-      lastRunTime?: string | null;
-      lastResult?: number | string | null;
-    };
-    const data: ScheduledTaskInfo = {
-      taskName: "WavesCo Lead Engine",
-      state: parsed.state ?? "Unknown",
-      nextRunTime: parsed.nextRunTime ?? null,
-      lastRunTime: parsed.lastRunTime ?? null,
-      lastResult:
-        typeof parsed.lastResult === "number"
-          ? String(parsed.lastResult)
-          : (parsed.lastResult ?? null),
-    };
-    schedCache = { at: Date.now(), data };
-    return data;
-  } catch {
-    schedCache = { at: Date.now(), data: null };
-    return null;
+    const started: boolean = j.ok;
+    return { started, error: j.error };
+  } catch (e) {
+    return { started: false, error: e instanceof Error ? e.message : "engine unreachable" };
   }
 }

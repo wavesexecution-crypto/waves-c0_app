@@ -16,7 +16,7 @@ export default async function ReportsPage() {
   let manifests: Awaited<ReturnType<typeof listBatchManifests>> = [];
   let error: string | null = null;
   try {
-    manifests = listBatchManifests();
+    manifests = await listBatchManifests();
   } catch (e) {
     error = e instanceof Error ? e.message : "Reports directory unreachable";
   }

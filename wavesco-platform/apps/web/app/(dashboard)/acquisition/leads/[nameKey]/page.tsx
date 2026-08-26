@@ -42,13 +42,7 @@ export default async function LeadProfilePage({ params }: PageProps) {
   const { nameKey: rawKey } = await params;
   const nameKey = decodeURIComponent(rawKey);
 
-  const lead = (() => {
-    try {
-      return getLead(nameKey);
-    } catch {
-      return undefined;
-    }
-  })();
+  const lead = await getLead(nameKey).catch(() => undefined);
   if (!lead) notFound();
 
   const { emails, followUps } = await withTenantContext(tenantId, async (tx) => ({

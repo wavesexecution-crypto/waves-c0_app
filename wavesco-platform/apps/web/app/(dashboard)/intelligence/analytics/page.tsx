@@ -34,14 +34,14 @@ export default async function AnalyticsPage() {
   let stats: Awaited<ReturnType<typeof getLeadStats>> | null = null;
   let corpusError: string | null = null;
   try {
-    stats = getLeadStats();
+    stats = await getLeadStats();
   } catch (e) {
     corpusError = e instanceof Error ? e.message : "Lead Engine unreachable";
   }
 
-  const byTier = stats ? getCountsBy("tier") : {};
-  const byCategory = stats ? getCountsBy("category") : {};
-  const byCity = stats ? getCountsBy("city") : {};
+  const byTier = stats ? await getCountsBy("tier") : {};
+  const byCategory = stats ? await getCountsBy("category") : {};
+  const byCity = stats ? await getCountsBy("city") : {};
 
   const platform = await withTenantContext(tenantId, async (tx) => ({
     campaigns: await tx.campaign.count({ where: { tenantId } }),
@@ -53,9 +53,9 @@ export default async function AnalyticsPage() {
     }),
   }));
 
-  const manifests = (() => {
+  const manifests = await (async () => {
     try {
-      return listBatchManifests().slice(0, 5);
+      return (await listBatchManifests()).slice(0, 5);
     } catch {
       return [];
     }

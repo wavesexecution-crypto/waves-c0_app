@@ -53,8 +53,8 @@ export default async function LeadsPage({
   let result: Awaited<ReturnType<typeof listLeads>> | null = null;
   let facets: Awaited<ReturnType<typeof getFacets>> | null = null;
   try {
-    result = listLeads(params);
-    facets = getFacets();
+    result = await listLeads(params);
+    facets = await getFacets();
   } catch (e) {
     error = e instanceof Error ? e.message : "Lead Engine unreachable";
   }

@@ -65,7 +65,7 @@ export default async function CampaignsPage() {
   let facets: Awaited<ReturnType<typeof getFacets>> | null = null;
   let engineError: string | null = null;
   try {
-    facets = getFacets();
+    facets = await getFacets();
   } catch (e) {
     engineError = e instanceof Error ? e.message : "Lead Engine unreachable";
   }
@@ -102,11 +102,11 @@ export default async function CampaignsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {campaigns.map((c) => {
+            {await Promise.all(campaigns.map(async (c) => {
               // Recompute eligibility NOW from real data for honest numbers
               let eligibleNow = 0;
               try {
-                const candidates = selectCampaignCandidates({
+                const candidates = await selectCampaignCandidates({
                   location: c.location ?? undefined,
                   category: c.category ?? undefined,
                   tier: c.tier ?? undefined,
@@ -126,7 +126,7 @@ export default async function CampaignsPage() {
                   tenantId={tenantId}
                 />
               );
-            })}
+            }))}
           </div>
         )}
       </section>

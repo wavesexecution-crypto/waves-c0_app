@@ -46,7 +46,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
   let facets: Awaited<ReturnType<typeof getFacets>> | null = null;
   try {
     leads = listPipelineLeads();
-    facets = getFacets();
+    facets = await getFacets();
   } catch (e) {
     corpusError = e instanceof Error ? e.message : "Lead Engine unreachable";
   }

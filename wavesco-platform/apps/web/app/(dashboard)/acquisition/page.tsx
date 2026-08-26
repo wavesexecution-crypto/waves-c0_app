@@ -18,8 +18,8 @@ export default async function AcquisitionPage() {
   let stats: Awaited<ReturnType<typeof getLeadStats>> | null = null;
   let facets: Awaited<ReturnType<typeof getFacets>> | null = null;
   try {
-    stats = getLeadStats();
-    facets = getFacets();
+    stats = await getLeadStats();
+    facets = await getFacets();
   } catch (e) {
     statsError = e instanceof Error ? e.message : "Lead Engine unreachable";
   }
@@ -34,10 +34,10 @@ export default async function AcquisitionPage() {
     followUpsPending: await tx.followUp.count({ where: { tenantId, status: "pending" } }),
   }));
 
-  const engineRun = stats ? safeRun() : null;
-  function safeRun() {
+  const engineRun = stats ? await safeRun() : null;
+  async function safeRun() {
     try {
-      return getLastEngineRun();
+      return await getLastEngineRun();
     } catch {
       return null;
     }

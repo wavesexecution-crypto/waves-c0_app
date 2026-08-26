@@ -108,7 +108,7 @@ function runChecks(lead: EngineLead): CheckResult[] {
     {
       name: "digital_presence",
       passed: !!lead.digital_assessment && lead.digital_assessment.trim().length > 0,
-      value: lead.digital_assessment,
+      value: lead.digital_assessment ?? null,
       weight: 5,
     },
     {

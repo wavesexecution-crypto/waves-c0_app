@@ -77,7 +77,7 @@ export async function recordActivity(
  * with the artifact's own timestamps preserved in metadata.
  */
 export async function backfillBatchActivity(tenantId: string): Promise<void> {
-  const manifests = listBatchManifests().slice(0, 10);
+  const manifests = (await listBatchManifests()).slice(0, 10);
   for (const m of manifests) {
     if (!m.batchId) continue;
     await recordActivity(tenantId, {

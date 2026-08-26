@@ -241,7 +241,7 @@ export async function checkLeadEmail(tenantId: string, nameKey: string): Promise
   // Write back ONLY outreach-state columns to the corpus so exports,
   // eligibility gates and dedupe stay consistent everywhere.
   try {
-    updateLeadOutreachState(nameKey, {
+    await updateLeadOutreachState(nameKey, {
       email_status:
         result.status === "VERIFIED"
           ? "Verified"

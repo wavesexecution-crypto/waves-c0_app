@@ -101,7 +101,7 @@ async function computeRaw(tenantId: string): Promise<Omit<IntegrationStatusView,
   {
     const root = leadEngineRoot();
     const dbExists = existsSync(join(root, "data", "leads.db"));
-    const run = dbExists ? getLastEngineRun() : undefined;
+    const run = dbExists ? await getLastEngineRun() : undefined;
     if (!process.env.LEAD_ENGINE_ROOT && !dbExists) {
       out.push({
         key: "lead_engine",
@@ -160,7 +160,7 @@ async function computeRaw(tenantId: string): Promise<Omit<IntegrationStatusView,
         hasEngineToken = false;
       }
     }
-    const manifests = listBatchManifests();
+    const manifests = await listBatchManifests();
     const delivered = manifests.find((m) => (m.telegramDeliveryStatus ?? "").includes("delivered"));
     if (hasPlatformToken || hasEngineToken) {
       const deliveryStatus = delivered?.telegramDeliveryStatus ?? "";

@@ -12,7 +12,7 @@ export async function buildCompanyContext(tenantId: string): Promise<string> {
 
   // Lead corpus (Lead Engine SQLite)
   try {
-    const s = getLeadStats();
+    const s = await getLeadStats();
     const tiers = Object.entries(s.byTier)
       .map(([k, v]) => `${k}=${v}`)
       .join(", ");

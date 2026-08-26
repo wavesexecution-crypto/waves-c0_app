@@ -180,7 +180,7 @@ async function finalizeIfComplete(tenantId: string, requestId: string): Promise<
     if (!batch || batch.status === "completed" || batch.status === "failed") return;
 
     const tail = tailFile(batch.params && (batch.params as { logFile?: string }).logFile ? (batch.params as { logFile: string }).logFile : "");
-    const manifest = newestManifestAfter(batch.startedAt ?? batch.createdAt);
+    const manifest = await newestManifestAfter(batch.startedAt ?? batch.createdAt);
 
     if (manifest) {
       await tx.generationBatch.update({
@@ -211,8 +211,8 @@ async function finalizeIfComplete(tenantId: string, requestId: string): Promise<
   });
 }
 
-function newestManifestAfter(since: Date): { batchId: string; generatedAt?: string; leadCount?: number; emailReadyCount?: number; pdfPath?: string; excelPath?: string } | undefined {
-  const all = listBatchManifests();
+async function newestManifestAfter(since: Date): Promise<{ batchId: string; generatedAt?: string; leadCount?: number; emailReadyCount?: number; pdfPath?: string; excelPath?: string } | undefined> {
+  const all = await listBatchManifests();
   return all.find((m) => {
     const t = m.generatedAt ? new Date(m.generatedAt).getTime() : 0;
     return t >= since.getTime() - 5000;

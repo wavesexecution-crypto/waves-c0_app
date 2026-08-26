@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { extname } from "node:path";
 import { requireSession } from "@wavesco/auth";
 import { auth } from "@/lib/auth";
-import { getBatchManifest } from "@/lib/wavesco/lead-engine";
+import { fetchManifestFile, getBatchManifest, leadEngineMode } from "@/lib/wavesco/lead-engine";
 
 export const runtime = "nodejs";
 
@@ -29,7 +29,23 @@ export async function GET(request: Request, ctx: RouteContext) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type") === "xlsx" ? "xlsx" : "pdf";
 
-  const manifest = getBatchManifest(batch);
+  // Remote mode: stream the file through the engine's authenticated API.
+  if (leadEngineMode() === "remote") {
+    const file = await fetchManifestFile(batch, type);
+    if (!file.ok) {
+      return NextResponse.json({ error: file.error }, { status: 404 });
+    }
+    return new NextResponse(new Uint8Array(file.body), {
+      headers: {
+        "content-type": file.contentType,
+        "content-disposition": `attachment; filename="${file.filename}"`,
+        "cache-control": "no-store",
+      },
+    });
+  }
+
+  // Local mode: read the file directly from the engine host.
+  const manifest = await getBatchManifest(batch);
   if (!manifest) {
     return NextResponse.json({ error: `No batch manifest for ${batch}` }, { status: 404 });
   }
