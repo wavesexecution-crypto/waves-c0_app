@@ -42,7 +42,7 @@ function apiToken(): string {
 
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${apiUrl()}${path}`, {
-    headers: { authorization: `Bearer ${apiToken()}` },
+    headers: { authorization: `Bearer ${apiToken()}`, "ngrok-skip-browser-warning": "true" },
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`engine API ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -52,7 +52,11 @@ async function apiGet<T>(path: string): Promise<T> {
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${apiUrl()}${path}`, {
     method: "POST",
-    headers: { authorization: `Bearer ${apiToken()}`, "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${apiToken()}`,
+      "content-type": "application/json",
+      "ngrok-skip-browser-warning": "true",
+    },
     body: JSON.stringify(body),
     cache: "no-store",
   });

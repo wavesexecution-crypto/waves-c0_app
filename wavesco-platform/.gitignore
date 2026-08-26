@@ -92,3 +92,7 @@ scripts/smoke-auth-routes.mts
 scripts/test-intelligence-e2e.mts
 scripts/pipeline-e2e.ts
 apps/web/scripts/
+
+# vercel
+.vercel
+
