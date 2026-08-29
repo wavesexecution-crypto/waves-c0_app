@@ -58,7 +58,7 @@ async function computeEligibility(params: {
 }
 
 /** Server-action wrapper: exact eligibility from the live corpus. */
-// eslint-disable-next-line @typescript-eslint/require-await
+ 
 export async function computeEligibilityAction(params: {
   location?: string;
   category?: string;

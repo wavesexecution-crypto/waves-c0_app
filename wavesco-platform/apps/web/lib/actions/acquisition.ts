@@ -7,7 +7,13 @@ import { withTenantContext } from "@wavesco/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { startGeneration } from "@/lib/wavesco/generation";
-import { getLead, updateLeadOutreachState } from "@/lib/wavesco/lead-engine";
+import {
+  getLastEngineRun,
+  getLead,
+  leadEngineMode,
+  listBatchManifests,
+  updateLeadOutreachState,
+} from "@/lib/wavesco/lead-engine";
 import { recordActivity } from "@/lib/wavesco/activity";
 
 async function requireUser(): Promise<{ tenantId: string; userId: string; role: string }> {
@@ -98,6 +104,63 @@ export async function getGenerationStatusAction(
   return withTenantContext(user.tenantId, async (tx) => {
     const row = await tx.generationBatch.findUnique({ where: { requestId } });
     if (!row) return null;
+
+    // Remote mode: lazily sync with engine so Vercel serverless polling can
+    // observe completion even though the in-process monitor does not survive.
+    if (leadEngineMode() === "remote" && row.status === "running") {
+      try {
+        const last = await getLastEngineRun().catch(() => undefined);
+        const tail =
+          (last as unknown as { log_tail?: string | null } | undefined)?.log_tail
+          ?? (last as unknown as { logTail?: string | null } | undefined)?.logTail
+          ?? null;
+        if (tail && tail !== row.logTail) {
+          await tx.generationBatch.update({ where: { requestId }, data: { logTail: tail.slice(-2000) } });
+          row.logTail = tail.slice(-2000);
+        }
+        const all = await listBatchManifests().catch(() => []);
+        const manifest = all.find((m) => {
+          const t = m.generatedAt ? new Date(m.generatedAt).getTime() : 0;
+          const since = (row.startedAt ?? row.createdAt).getTime();
+          return t >= since - 5000;
+        });
+        if (manifest) {
+          await tx.generationBatch.update({
+            where: { requestId },
+            data: {
+              status: "completed",
+              stage: "completed",
+              engineBatchId: manifest.batchId,
+              resultLeadCount: manifest.leadCount ?? null,
+              emailReadyCount: manifest.emailReadyCount ?? null,
+              pdfPath: manifest.pdfPath ?? null,
+              excelPath: manifest.excelPath ?? null,
+              finishedAt: new Date(),
+              logTail: tail?.slice(-2000) ?? row.logTail,
+            },
+          });
+          const updated = await tx.generationBatch.findUnique({ where: { requestId } });
+          if (updated) {
+            return {
+              requestId: updated.requestId,
+              status: updated.status,
+              stage: updated.stage,
+              logTail: updated.logTail ? updated.logTail.slice(-1200) : null,
+              engineBatchId: updated.engineBatchId,
+              resultLeadCount: updated.resultLeadCount,
+              emailReadyCount: updated.emailReadyCount,
+              pdfPath: updated.pdfPath,
+              excelPath: updated.excelPath,
+              error: updated.error,
+              finishedAt: updated.finishedAt?.toISOString() ?? null,
+            };
+          }
+        }
+      } catch {
+        // best-effort — return current row if engine probe fails
+      }
+    }
+
     return {
       requestId: row.requestId,
       status: row.status,

@@ -3,7 +3,15 @@ import { appendFileSync, existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { withTenantContext } from "@wavesco/db";
-import { leadEngineRoot, pythonExe, runsDir, listBatchManifests } from "./lead-engine";
+import {
+  leadEngineMode,
+  leadEngineRoot,
+  pythonExe,
+  runsDir,
+  listBatchManifests,
+  startGenerationRemote,
+  getLastEngineRun,
+} from "./lead-engine";
 
 /**
  * Spawns the REAL Lead Engine CLI (run.py) as a detached child process
@@ -59,12 +67,60 @@ export function deriveStage(logTail: string | null): string | null {
 /**
  * Starts a generation run. Returns the requestId used to track status,
  * or an error describing why the engine could not be started.
+ * In remote mode (Vercel) the engine is driven via its HTTP API; no
+ * filesystem or venv is required.
  */
 export async function startGeneration(
   tenantId: string,
   userId: string,
   params: GenerationParams,
 ): Promise<{ ok: true; requestId: string } | { ok: false; error: string }> {
+  // ------------------------------------------------------------------
+  // Remote mode: drive the engine via HTTP API (production / Vercel)
+  // ------------------------------------------------------------------
+  if (leadEngineMode() === "remote") {
+    const requestId = `gen_${randomUUID().replace(/-/g, "").slice(0, 20)}`;
+    const logPath = logFileFor(requestId);
+
+    await withTenantContext(tenantId, async (tx) => {
+      await tx.generationBatch.create({
+        data: {
+          tenantId,
+          requestId,
+          params: { ...params, logFile: logPath } as never,
+          status: "queued",
+          requestedCount: params.requestedCount,
+        },
+      });
+    });
+
+    const remote = await startGenerationRemote(params.requestedCount);
+    if (!remote.started) {
+      const msg = remote.error ?? "Lead Engine remote API unreachable";
+      await withTenantContext(tenantId, async (tx) => {
+        await tx.generationBatch.update({
+          where: { requestId },
+          data: { status: "failed", error: msg, finishedAt: new Date() },
+        });
+      });
+      return { ok: false, error: msg };
+    }
+
+    await withTenantContext(tenantId, async (tx) => {
+      await tx.generationBatch.update({
+        where: { requestId },
+        data: { status: "running", startedAt: new Date(), params: { ...params, logFile: logPath } as never },
+      });
+    });
+
+    // Poll the remote engine for completion without blocking the request.
+    monitorGenerationRemote(requestId, tenantId);
+    return { ok: true, requestId };
+  }
+
+  // ------------------------------------------------------------------
+  // Local mode: spawn the Python CLI directly (development)
+  // ------------------------------------------------------------------
   const py = pythonExe();
   const script = join(leadEngineRoot(), "run.py");
   if (!existsSync(py)) {
@@ -137,6 +193,79 @@ export async function startGeneration(
 /** In-process watcher that closes the batch row when the engine exits. */
 const watched = new Set<string>();
 
+export function monitorGenerationRemote(requestId: string, tenantId: string): void {
+  if (watched.has(requestId)) return;
+  watched.add(requestId);
+  let checks = 0;
+  const timer = setInterval(() => {
+    void (async () => {
+      checks++;
+      try {
+        const batch = await withTenantContext(tenantId, (tx) =>
+          tx.generationBatch.findUnique({ where: { requestId } }),
+        );
+        if (batch?.status !== "running") {
+          clearInterval(timer);
+          watched.delete(requestId);
+          return;
+        }
+        const last = await getLastEngineRun().catch(() => undefined);
+        const tail: string | null =
+          (last as unknown as { log_tail?: string | null } | undefined)?.log_tail
+          ?? (last as unknown as { logTail?: string | null } | undefined)?.logTail
+          ?? null;
+      const manifest = await newestManifestAfter(batch.startedAt ?? batch.createdAt);
+      if (tail) {
+        await withTenantContext(tenantId, (tx) =>
+          tx.generationBatch.update({ where: { requestId }, data: { logTail: tail.slice(-2000) } }),
+        );
+      }
+      if (manifest) {
+        await withTenantContext(tenantId, (tx) =>
+          tx.generationBatch.update({
+            where: { requestId },
+            data: {
+              status: "completed",
+              stage: "completed",
+              engineBatchId: manifest.batchId,
+              resultLeadCount: manifest.leadCount ?? null,
+              emailReadyCount: manifest.emailReadyCount ?? null,
+              pdfPath: manifest.pdfPath ?? null,
+              excelPath: manifest.excelPath ?? null,
+              finishedAt: new Date(),
+              logTail: tail?.slice(-2000) ?? batch.logTail,
+            },
+          }),
+        );
+        clearInterval(timer);
+        watched.delete(requestId);
+        return;
+      }
+      if (checks > 180) {
+        await withTenantContext(tenantId, (tx) =>
+          tx.generationBatch.update({
+            where: { requestId },
+            data: {
+              status: "failed",
+              error: "Engine did not produce a manifest within 30 minutes.",
+              finishedAt: new Date(),
+            },
+          }),
+        );
+        clearInterval(timer);
+        watched.delete(requestId);
+      }
+    } catch {
+      if (checks > 180) {
+        clearInterval(timer);
+        watched.delete(requestId);
+      }
+    }
+    })();
+  }, 10_000);
+  timer.unref();
+}
+
 export function monitorGeneration(requestId: string, tenantId: string, pid: number | null): void {
   if (watched.has(requestId)) return;
   watched.add(requestId);
@@ -179,7 +308,20 @@ async function finalizeIfComplete(tenantId: string, requestId: string): Promise<
     const batch = await tx.generationBatch.findUnique({ where: { requestId } });
     if (!batch || batch.status === "completed" || batch.status === "failed") return;
 
-    const tail = tailFile(batch.params && (batch.params as { logFile?: string }).logFile ? (batch.params as { logFile: string }).logFile : "");
+    let tail: string | null = null;
+    if (leadEngineMode() === "remote") {
+      try {
+        const last = await getLastEngineRun();
+        tail =
+          (last as unknown as { log_tail?: string | null } | undefined)?.log_tail
+          ?? (last as unknown as { logTail?: string | null } | undefined)?.logTail
+          ?? null;
+      } catch {
+        tail = null;
+      }
+    } else {
+      tail = tailFile(batch.params && (batch.params as { logFile?: string }).logFile ? (batch.params as { logFile: string }).logFile : "");
+    }
     const manifest = await newestManifestAfter(batch.startedAt ?? batch.createdAt);
 
     if (manifest) {

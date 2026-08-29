@@ -4,8 +4,10 @@ import { withTenantContext } from "@wavesco/db";
 import { getHealth, n8nApiKey, n8nBaseUrl } from "./n8n";
 import {
   getLastEngineRun,
+  leadEngineMode,
   leadEngineRoot,
   listBatchManifests,
+  remoteAvailability,
 } from "./lead-engine";
 
 /**
@@ -98,7 +100,34 @@ async function computeRaw(tenantId: string): Promise<Omit<IntegrationStatusView,
   const out: Omit<IntegrationStatusView, "lastCheckedAt" | "lastOkAt">[] = [];
 
   // Lead Engine -----------------------------------------------------
-  {
+  if (leadEngineMode() === "remote") {
+    const avail = await remoteAvailability();
+    if (!avail.available) {
+      out.push({
+        key: "lead_engine",
+        label: "Lead Engine",
+        state: "error",
+        detail: `Remote Lead Engine unreachable: ${avail.detail}`,
+      });
+    } else {
+      try {
+        const run = await getLastEngineRun();
+        out.push({
+          key: "lead_engine",
+          label: "Lead Engine",
+          state: "connected",
+          detail: run?.started_at ? `Last run started ${run.started_at} (remote)` : "Remote Lead Engine reachable (API mode).",
+        });
+      } catch {
+        out.push({
+          key: "lead_engine",
+          label: "Lead Engine",
+          state: "connected",
+          detail: "Remote Lead Engine reachable.",
+        });
+      }
+    }
+  } else {
     const root = leadEngineRoot();
     const dbExists = existsSync(join(root, "data", "leads.db"));
     const run = dbExists ? await getLastEngineRun() : undefined;
@@ -108,7 +137,8 @@ async function computeRaw(tenantId: string): Promise<Omit<IntegrationStatusView,
         label: "Lead Engine",
         state: "disconnected",
         detail: "LEAD_ENGINE_ROOT not configured and default path not found.",
-      });    } else if (!dbExists) {
+      });
+    } else if (!dbExists) {
       out.push({
         key: "lead_engine",
         label: "Lead Engine",
