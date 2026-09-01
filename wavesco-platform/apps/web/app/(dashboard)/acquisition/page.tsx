@@ -6,6 +6,7 @@ import { withTenantContext } from "@wavesco/db";
 import { getFacets, getLeadStats, getLastEngineRun } from "@/lib/wavesco/lead-engine";
 import { MetricCard, SectionHeader, StatusPill } from "@/components/command/primitives";
 import { formatIST, relativeFrom } from "@/lib/wavesco/time";
+import { OverviewLive } from "@/components/acquisition/overview-live";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Acquisition OS" };
@@ -105,6 +106,8 @@ export default async function AcquisitionPage() {
           {engineRun.added ?? 0} · Telegram {engineRun.telegram_status ?? "—"}
         </p>
       ) : null}
+
+      <OverviewLive />
     </div>
   );
 }
