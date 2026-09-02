@@ -1,0 +1,86 @@
+import { NextResponse } from "next/server";
+import { auditControl, requireControlAuth } from "@/lib/wavesco/control";
+import { withTenantContext } from "@wavesco/db";
+
+export const dynamic = "force-dynamic";
+
+const VALID_ACTIONS = ["launch", "pause", "resume", "stop"] as const;
+type Action = (typeof VALID_ACTIONS)[number];
+
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  try {
+    const { tenantId, userId } = await requireControlAuth();
+    const { id } = await ctx.params;
+
+    let body: Record<string, unknown> = {};
+    try {
+      const raw = await req.text();
+      if (raw) body = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      // invalid JSON -> will be caught as invalid action
+    }
+
+    const action = typeof body.action === "string" ? body.action.trim() : "";
+    if (!VALID_ACTIONS.includes(action as Action)) {
+      return NextResponse.json(
+        { error: "invalid action", valid: VALID_ACTIONS, received: action || null },
+        { status: 400 }
+      );
+    }
+
+    const result: any = await withTenantContext(tenantId, async (tx: any) => {
+      const campaign = await tx.campaign.findFirst({ where: { id, tenantId } });
+      if (!campaign) return { notFound: true };
+
+      const before = { status: campaign.status };
+      let nextStatus: string | null = null;
+      let invalidReason: string | null = null;
+
+      if (action === "launch" && campaign.status === "draft") nextStatus = "scheduled";
+      else if (action === "pause" && campaign.status === "running") nextStatus = "paused";
+      else if (action === "resume" && campaign.status === "paused") nextStatus = "running";
+      else if (action === "stop" && ["running", "paused", "scheduled"].includes(campaign.status))
+        nextStatus = "stopped";
+      else {
+        invalidReason = `cannot ${action} from ${campaign.status}`;
+      }
+
+      if (!nextStatus) {
+        return { invalid: true, reason: invalidReason ?? `cannot ${action} from ${campaign.status}`, currentStatus: campaign.status, before };
+      }
+
+      await tx.campaign.update({ where: { id: campaign.id }, data: { status: nextStatus } });
+      await auditControl({
+        tenantId,
+        userId,
+        action: `campaign.${action}`,
+        model: "Campaign",
+        recordId: campaign.id,
+        before,
+        after: { status: nextStatus },
+      });
+
+      return { ok: true, status: nextStatus, campaignId: campaign.id, before };
+    });
+
+    if (result.notFound) {
+      return NextResponse.json({ error: "campaign not found" }, { status: 404 });
+    }
+    if (result.invalid) {
+      return NextResponse.json({ error: result.reason, currentStatus: result.currentStatus }, { status: 400 });
+    }
+    return NextResponse.json({ status: result.status, id: result.campaignId }, { status: 200 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const digest = (e as { digest?: string })?.digest as string | undefined;
+    const isUnauthorized =
+      msg === "UNAUTHORIZED" ||
+      msg.includes("UNAUTHORIZED") ||
+      msg.includes("NEXT_REDIRECT") ||
+      (digest !== undefined && digest.includes("NEXT_REDIRECT"));
+    if (isUnauthorized) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    return NextResponse.json({ error: "internal", detail: msg }, { status: 500 });
+  }
+}
