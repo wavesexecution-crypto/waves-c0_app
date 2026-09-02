@@ -497,7 +497,7 @@ Live Vercel (`vercel env ls` 2026-09-02): `DATABASE_URL, DIRECT_URL, NEXTAUTH_UR
 **Agent context:** `company/objective/icp/offer/brand/existing_data/integrations/constraints/operating_preferences/current_state/historical_context/meta` — `maskUrl` + `redactSecrets`, `meta.model="nemotron-3-super"`.
 
 
-## 14b — Waves Identity / Cross-Site SSO (2026-09-02)
+## 14b — Waves Identity / Cross-Site SSO — Simplified (2026-09-02)
 
 **Canonical identity:** `Tenant` + `User` (email, passwordHash, tenantId, role) in Neon Postgres, owned by `prisma`. Auth via `NextAuth v5` (`@wavesco/auth` `authConfig` — Credentials + Nodemailer via Resend, JWT strategy `maxAge 30d`, `AUTH_SECRET` ≥32, `JWT_SECRET` for `jose HS256` access/refresh tokens). `User @@unique([tenantId,email])`, `RefreshToken`, `VerificationToken`. `Tenant.slug @unique`, `TenantModule` for entitlements, `WavesHandoffToken jti@unique` for single-use handoff.
 
