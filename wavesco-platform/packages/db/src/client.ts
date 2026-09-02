@@ -5,6 +5,12 @@ const base = new PrismaClient();
 
 export const prisma = base.$extends(auditExtension(base));
 
+export function getDirectPrisma() {
+  const url = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  if (!url) throw new Error("DIRECT_URL missing");
+  return new PrismaClient({ datasources: { db: { url } } } as any);
+}
+
 export type DB = typeof prisma;
 
 export { Prisma } from "./generated/client";

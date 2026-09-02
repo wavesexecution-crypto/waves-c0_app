@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@wavesco/db/src/generated/client";
+import { getDirectPrisma } from "@wavesco/db";
 
 export const dynamic = "force-dynamic";
 
@@ -92,9 +92,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON "AcquisitionProfile", "AcquisitionDataIm
 INSERT INTO "_prisma_migrations" (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) VALUES (gen_random_uuid(), 'acquisition-profile-manual', NOW(), '20260902000000_acquisition_profile', '', NULL, NOW(), 1) ON CONFLICT DO NOTHING;
   `;
 
-  const directUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
-  if (!directUrl) return NextResponse.json({ error: "DIRECT_URL missing" }, { status: 500 });
-  const direct = new PrismaClient({ datasources: { db: { url: directUrl } } } as any);
+  let direct: any;
+  try {
+    direct = getDirectPrisma();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
   try {
     const statements = sql.split(";").map(s => s.trim()).filter(s => s.length > 0);
     for (const stmt of statements) {

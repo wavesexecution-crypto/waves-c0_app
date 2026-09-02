@@ -1,4 +1,4 @@
-export { prisma, Prisma } from "./client";
+export { prisma, Prisma, getDirectPrisma } from "./client";
 export type { DB } from "./client";
 export * from "./context";
 export * from "./rls";
