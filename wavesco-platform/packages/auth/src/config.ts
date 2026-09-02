@@ -125,8 +125,8 @@ export const authConfig: NextAuthConfig = {
   ],
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Allow relative URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allow relative URLs, but not protocol-relative //evil.com
+      if (url.startsWith("/") && !url.startsWith("//")) return `${baseUrl}${url}`;
       try {
         const dest = new URL(url);
         const base = new URL(baseUrl);
