@@ -21,7 +21,7 @@ export default async function LoginPage() {
       <Card>
         <CardHeader>
           <CardTitle>Your Waves profile is already connected</CardTitle>
-          <CardDescription>Enter your password to continue to app.wavesco.in</CardDescription>
+          <CardDescription>Enter your password to continue to the app</CardDescription>
         </CardHeader>
         <CardContent>
           <Suspense>
@@ -35,32 +35,23 @@ export default async function LoginPage() {
     );
   }
 
-  // No recognized Waves profile — send to main site
-  const wavesMain = process.env.WAVES_MAIN_URL || "https://wavesco.in";
+  // No recognized Waves profile — show local email+password login
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Continue with your Waves profile</CardTitle>
-        <CardDescription>Your Waves account is used across Waves. No separate login is required for Acquisition OS.</CardDescription>
+        <CardTitle>Sign in to your Waves account</CardTitle>
+        <CardDescription>Use your Waves credentials to access the app.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground">
-          <p className="font-medium text-foreground">Waves Account → Tenant → Products → Acquisition OS</p>
-          <p>Continue to Waves to access your account.</p>
-        </div>
-        <a
-          href={`${wavesMain}/login`}
-          className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Continue to Waves
-        </a>
-        <p className="mt-3 text-center text-xs text-muted-foreground">No recognized Waves profile. Continue on Waves to sign in again.</p>
-        <div className="mt-6 border-t pt-4">
-          <p className="text-center text-xs text-muted-foreground">Or sign in directly (local dev):</p>
-          <Suspense>
-            <LoginForm />
-          </Suspense>
-        </div>
+        <Suspense>
+          <LoginForm />
+        </Suspense>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link href="https://wavesco.in/signup" className="font-medium text-primary hover:underline">
+            Create one on Waves
+          </Link>
+        </p>
       </CardContent>
     </Card>
   );
