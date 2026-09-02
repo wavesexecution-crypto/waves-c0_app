@@ -4,6 +4,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { getFacets, listLeads, type ListLeadsParams } from "@/lib/wavesco/lead-engine";
+import { LeadsExportButton } from "@/components/acquisition/leads-export-button";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Leads" };
@@ -77,6 +78,57 @@ export default async function LeadsPage({
         <Link href="/acquisition/generate" className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
           + Generate leads
         </Link>
+      </div>
+
+      {/* Control bar — Discover / Import / Export / Segment */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
+        <Link
+          href="/acquisition/generate"
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Discover
+        </Link>
+        <Link
+          href="/acquisition/generate?tab=import"
+          className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+          title="Import CSV — placeholder, uses Generate pipeline"
+        >
+          Import
+        </Link>
+        <LeadsExportButton
+          filters={{
+            q: sp.q,
+            tier: sp.tier,
+            category: sp.category,
+            city: sp.city,
+            outreach: sp.outreach,
+          }}
+        />
+        <span className="ml-2 hidden text-xs font-medium uppercase tracking-widest text-muted-foreground sm:inline">Segment:</span>
+        <div className="flex items-center gap-1">
+          {(["A", "B", "C"] as const).map((t) => (
+            <Link
+              key={t}
+              href={`/acquisition/leads?${qs({ tier: t, page: undefined })}`}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                sp.tier === t ? "border-primary/40 bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              Tier {t}
+            </Link>
+          ))}
+          {sp.tier ? (
+            <Link
+              href={`/acquisition/leads?${qs({ tier: undefined, page: undefined })}`}
+              className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent"
+            >
+              All
+            </Link>
+          ) : null}
+        </div>
+        <span className="ml-auto hidden text-[11px] text-muted-foreground lg:inline">
+          Export is tenant-scoped · max 1000 rows · CSV
+        </span>
       </div>
 
       {error ? (
@@ -160,6 +212,7 @@ export default async function LeadsPage({
                       <th className="px-4 py-2.5">Email</th>
                       <th className="px-4 py-2.5">Site</th>
                       <th className="px-4 py-2.5">Outreach</th>
+                      <th className="px-4 py-2.5">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -172,11 +225,34 @@ export default async function LeadsPage({
                           <span className="block text-[11px] text-muted-foreground">{l.category ?? "—"}</span>
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground">{[l.area, l.city].filter(Boolean).join(", ") || "—"}</td>
-                        <td className="px-4 py-2.5 tabular-nums">{l.lead_score ?? "—"}</td>
+                        <td className="px-4 py-2.5 tabular-nums">
+                          <span className="inline-flex items-center gap-1">
+                            {l.lead_score ?? "—"}
+                            {l.lead_score != null && l.lead_score >= 80 ? (
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="High score" />
+                            ) : null}
+                          </span>
+                        </td>
                         <td className="px-4 py-2.5">{tierBadge(l.tier)}</td>
                         <td className="px-4 py-2.5 text-xs">{emailCell(l.email, l.email_status)}</td>
                         <td className="px-4 py-2.5 text-xs text-muted-foreground">{l.site_class ?? "—"}</td>
                         <td className="px-4 py-2.5 text-xs">{outreachCell(l)}</td>
+                        <td className="px-4 py-2.5 text-xs">
+                          <div className="flex flex-col gap-1">
+                            <Link
+                              href={`/acquisition/leads/${encodeURIComponent(l.name_key)}`}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              Inspect
+                            </Link>
+                            <Link href={`/acquisition/leads/${encodeURIComponent(l.name_key)}#enrich`} className="text-muted-foreground hover:text-foreground hover:underline">
+                              Enrich
+                            </Link>
+                            <Link href={`/acquisition/leads/${encodeURIComponent(l.name_key)}#verify`} className="text-muted-foreground hover:text-foreground hover:underline">
+                              Verify
+                            </Link>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

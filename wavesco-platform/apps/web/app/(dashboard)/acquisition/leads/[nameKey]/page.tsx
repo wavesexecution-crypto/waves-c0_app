@@ -7,6 +7,7 @@ import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { getLead } from "@/lib/wavesco/lead-engine";
 import { LeadOutreachForm } from "@/components/acquisition/outreach-form";
+import { LeadDetailActions } from "@/components/acquisition/lead-detail-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,12 @@ export default async function LeadProfilePage({ params }: PageProps) {
             <p className="text-xl font-semibold">{lead.tier ?? "—"}</p>
           </div>
         </div>
+      </div>
+
+      {/* Lead Control — Enrich / Verify / Qualify / Score (tenant-scoped, audited, idempotent) */}
+      <div className="rounded-lg border bg-card p-4">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-muted-foreground">Lead Control</h2>
+        <LeadDetailActions nameKey={nameKey} />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">

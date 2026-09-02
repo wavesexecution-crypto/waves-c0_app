@@ -7,6 +7,7 @@ import { withTenantContext } from "@wavesco/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { recordActivity } from "@/lib/wavesco/activity";
+import { auditControl } from "@/lib/wavesco/control";
 import {
   cancelOrder,
   checkLeadEmail,
@@ -56,6 +57,16 @@ export async function researchLeadAction(
   const res = await researchLead(user.tenantId, parsed.data.nameKey);
   if (!res.ok) return { ok: false, error: res.error };
 
+  // audit enrich — safe, tenant-scoped
+  await auditControl({
+    tenantId: user.tenantId,
+    userId: user.userId,
+    action: "leads.enrich",
+    model: "LeadResearch",
+    recordId: parsed.data.nameKey,
+    after: { researched: true },
+  }).catch(() => {});
+
   revalidatePipeline();
   return { ok: true, message: "Research snapshot saved." };
 }
@@ -70,6 +81,14 @@ export async function checkLeadEmailAction(
   if (!parsed.success) return { ok: false, error: "Invalid lead." };
 
   const res = await checkLeadEmail(user.tenantId, parsed.data.nameKey);
+  await auditControl({
+    tenantId: user.tenantId,
+    userId: user.userId,
+    action: "leads.verify",
+    model: "LeadResearch",
+    recordId: parsed.data.nameKey,
+    after: { status: res.status, email: res.email },
+  }).catch(() => {});
   revalidatePipeline();
   return res.ok
     ? { ok: true, message: `${res.status}${res.reason ? ` — ${res.reason}` : ""}` }
