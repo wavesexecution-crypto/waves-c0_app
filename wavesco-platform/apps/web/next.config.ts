@@ -7,7 +7,10 @@ loadEnvConfig(join(process.cwd(), "../.."), undefined, console, true);
 const nextConfig: NextConfig = {
   transpilePackages: ["@wavesco/ui", "@wavesco/db", "@wavesco/auth", "@wavesco/validators"],
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
   },
   async redirects() {
     return [

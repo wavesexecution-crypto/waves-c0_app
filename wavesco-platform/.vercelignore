@@ -1,0 +1,14 @@
+node_modules
+.pnpm-store
+.next
+.turbo
+.vercel
+dist
+build
+*.log
+.env
+.env.local
+packages/db/src/generated
+apps/web/.next
+apps/web/dist
+wavesco-platform/node_modules

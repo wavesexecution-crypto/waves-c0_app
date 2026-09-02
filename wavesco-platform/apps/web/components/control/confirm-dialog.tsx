@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@wavesco/ui/src/dialog";
+} from "@wavesco/ui";
 
 interface ConfirmDialogProps {
   open: boolean;
