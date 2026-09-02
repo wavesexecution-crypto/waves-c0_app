@@ -45,6 +45,7 @@ export function Sidebar({ internalAccess = true }: { internalAccess?: boolean })
       title: "Acquisition OS",
       items: [
         { href: "/acquisition", label: "Overview", icon: Radar },
+        { href: "/acquisition/profile", label: "Company Profile", icon: Settings },
         { href: "/acquisition/leads", label: "Leads", icon: Target },
         { href: "/acquisition/generate", label: "Lead Engine", icon: Sparkles },
         { href: "/acquisition/pipeline", label: "Outreach Pipeline", icon: Radar },

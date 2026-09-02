@@ -490,3 +490,66 @@ model AiUsageLog {
 
   @@index([tenantId, createdAt])
 }
+
+// --- Acquisition Brief / Company Acquisition Profile ------------------------
+// Canonical client business context — one per tenant, tenant-isolated.
+// The OS converts this context into an acquisition operation. No tier gating.
+model AcquisitionProfile {
+  id                       String                    @id @default(cuid())
+  tenantId                 String                    @unique
+  status                   String                    @default("DRAFT")
+  version                  Int                       @default(1)
+  // 1 COMPANY
+  companyName              String?
+  website                  String?
+  industry                 String?
+  whatWeSell               String?
+  productsServices         Json?
+  locationsServed          Json?
+  businessModel            String?
+  // 2 OBJECTIVE
+  acquisitionObjective     String?
+  primaryObjective         String?
+  targetQuantity           Int?
+  targetTimeframe          String?
+  priorityProductService   String?
+  // 3 ICP
+  icp                      Json?
+  // 5 OFFER
+  offer                    Json?
+  // 6 BRAND
+  brand                    Json?
+  // 7 INFRA
+  integrations             Json?
+  // 8 RULES
+  rules                    Json?
+  readiness                Json?
+  activatedAt              DateTime?
+  pausedAt                 DateTime?
+  suspendedAt              DateTime?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  dataImports              AcquisitionDataImport[]
+
+  @@index([tenantId, status])
+  @@map("AcquisitionProfile")
+}
+
+model AcquisitionDataImport {
+  id        String             @id @default(cuid())
+  tenantId  String
+  profileId String
+  profile   AcquisitionProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  fileName  String
+  fileType  String
+  rowCount  Int?
+  status    String             @default("pending")
+  summary   Json?
+  error     String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([tenantId, profileId])
+  @@index([tenantId, status])
+  @@map("AcquisitionDataImport")
+}
