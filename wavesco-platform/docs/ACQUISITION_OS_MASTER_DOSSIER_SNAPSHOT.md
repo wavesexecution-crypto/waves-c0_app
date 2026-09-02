@@ -2,7 +2,7 @@
 
 > **Owner:** WavesCo · **Vault:** `WavesCo/Acquisition OS` · **Repo:** `D:\waves-c0_app\wavesco-platform`
 > **Created:** 2026-09-02 (Task 1 — Freeze, Inspect, and Seed)
-> **Status:** SKELETON — 44 headings seeded; factual fields filled from freeze inspection; remainder marked `— filled —`
+> **Status:** UPDATED 2026-09-02 — Acquisition Brief / Company Profile (Rented OS, no tiers) — 133 tests, 26 models, Company Profile live
 > **Freeze commit (platform):** `29ba04d` — `chore: redeploy with synced DB env for lead engine verification` (branch `main`, up to date with `origin/main` at freeze)
 > **Lead Engine:** `D:\wavesco-lead-engine` — not a git repo (standalone Python engine, dual-mode local SQLite / remote HTTP)
 
@@ -169,7 +169,7 @@ check_schema.py  config.json  find_powai_leads.py  README.md  run.bat  run.py  s
 
 ## 1 — Vision
 
-**Acquisition OS is the revenue engine control plane for WavesCo's founder-led client acquisition loop: discover → enrich → verify → qualify → score → CRM → outreach → response → follow-up → analysis → report → PDF → email → audit.** It turns the standalone Lead Engine (local SQLite `data/leads.db` or remote HTTP `LEAD_ENGINE_API_URL`) and the tenant-scoped Postgres (Neon) platform into a single auditable, controllable system operated from `https://app.wavesco.in` (`waves-c0-app`).
+**Acquisition OS is the rented, operated revenue engine for a client: Choose. Rent. Operate. — one complete OS per rental, no Starter/Growth/Pro tiers, no feature gating.** It is the revenue engine control plane for WavesCo's founder-led client acquisition loop: discover → enrich → verify → qualify → score → CRM → outreach → response → follow-up → analysis → report → PDF → email → audit. The client provides business context (Company → Objective → ICP → Data → Offer → Brand → Integrations → Rules → Acquisition Brief); the OS converts that context into an acquisition operation. Nemotron 3 Super reasons/plans/orchestrates; deterministic services execute; results return to OS state, persisted and audited. Large-context treated as architectural capability via structured company/acquisition context layer, not dump. It turns the standalone Lead Engine (local SQLite `data/leads.db` or remote HTTP `LEAD_ENGINE_API_URL`) and the tenant-scoped Postgres (Neon) platform into a single auditable, controllable system operated from `https://app.wavesco.in` (`waves-c0-app`).
 
 Control Center goal (plan, §Goal): Monitor, Configure, Execute, Pause/Resume, and Analyze the entire Acquisition OS via authenticated APIs with real-time state and `AuditLog` per action. Verified build: Next.js 15.1.6 App Router `apps/web/app/(dashboard)/acquisition/*`, Prisma 6.2.1, Tailwind + shadcn `packages/ui`, Vercel `waves-c0-app` → `app.wavesco.in`. Evidence: `apps/web/package.json:21` `next@15.1.6`, `packages/db/package.json` `prisma@6.2.1`, `vercel inspect` alias `app.wavesco.in` Ready 2026-08-30.
 
@@ -179,7 +179,13 @@ Control Center goal (plan, §Goal): Monitor, Configure, Execute, Pause/Resume, a
 
 ## 3 — Scope
 
-**In-scope (8 operational areas per plan + System, total 10 control surfaces):**
+**In-scope (8 operational areas per plan + System + Company Profile, total 11 control surfaces):**
+**Commercial: One Acquisition OS, no tiers — “Choose. Rent. Operate.” Client rents the complete OS while subscription active.**
+
+**Client → Acquisition OS Input Model (8 groups): Company, Objective, ICP, Existing Data, Offer, Brand, Infrastructure, Rules → Acquisition Brief → Operational Context → Nemotron 3 Super → Discover→Enrich→Verify→Qualify→Score→Segment→Outreach→Follow-up→Analyze → Results.**
+**Client never configures agents/prompts/workflows/scoring/enrichment/routing/tools/model/orchestration — OS does.**
+
+
 1. **Overview** (`/acquisition`, `GET /api/acquisition/overview`) — pipeline, campaigns, health
 2. **Leads** (`/acquisition/leads`, `leads/[nameKey]`, `POST /api/acquisition/leads/export`) — discover/import (via `/generate`), enrich, verify, qualify, score, segment, search/filter, inspect, export (tenant-scoped CSV, max 1000, audit `leads.export`)
 3. **Campaigns** (`/acquisition/campaigns`, `POST /api/acquisition/campaigns/[id]/control` launch/pause/resume/stop, state machine draft→scheduled→running→paused→stopped→completed with before/after AuditLog)
@@ -188,8 +194,9 @@ Control Center goal (plan, §Goal): Monitor, Configure, Execute, Pause/Resume, a
 6. **Integrations** (`/acquisition/integrations`, `POST /api/acquisition/integrations/test`) — Lead Engine / Postgres / n8n / Brevo / Ollama matrix with masked Test Connection
 7. **Documents** (`/acquisition/reports` → Documents, `POST /api/acquisition/documents/generate`) — `GenerationBatch` pdfPath/excelPath lineage via `engineBatchId` + `ActivityEvent.sourceKey`
 8. **Email** (`/acquisition/email` + `/acquisition/outreach`, `POST /api/acquisition/email/templates` CRUD) — templates, preview (lead vars without send), delivery states submitted/approved/sent/failed + `sendError`, Brevo/SMTP approval `decideApprovalAction`
-9. **Analytics** (`/acquisition/analytics`, `GET /api/acquisition/analytics`) — acquisition metrics, campaign perf, funnel, response rates, workflow perf, API usage, model/token usage, costs (aggregated tenant-scoped)
-10. **System** (`/system` or `acquisition/system`, `GET /api/system/health|logs|audit-logs`) — health cards, logs (last 50 ActivityEvent), errors (failed OutreachEmail/GenerationBatch), jobs (pending FollowUp/batches), queues (outreach pending), DB state (counts), masked config, filterable audit logs
+9. **Company Profile** (`/acquisition/profile`, `GET/POST/PATCH /api/acquisition/profile`, `POST /api/acquisition/profile/control` activate/pause/resume/suspend, `GET /api/acquisition/profile/context` masked Nemotron context, `POST /api/acquisition/profile/import` CSV/Excel) — Company→Objective→ICP→Data→Offer→Brand→Integrations→Rules → Brief → readiness (deterministic) → activation → operational context
+10. **Analytics** (`/acquisition/analytics`, `GET /api/acquisition/analytics`) — acquisition metrics, campaign perf, funnel, response rates, workflow perf, API usage, model/token usage, costs (aggregated tenant-scoped)
+11. **System** (`/system` or `acquisition/system`, `GET /api/system/health|logs|audit-logs`) — health cards, logs (last 50 ActivityEvent), errors (failed OutreachEmail/GenerationBatch), jobs (pending FollowUp/batches), queues (outreach pending), DB state (counts), masked config, filterable audit logs
 
 **Out-of-scope boundaries:** Direct browser exposure of provider keys; duplicating Lead Engine corpus (read live, write only `updateLeadOutreachState`); Google Drive integration (no code path → `unavailable`); committing one workspace into another (`wavesco-platform` vs `wavesco-lead-engine` separate).
 
@@ -285,7 +292,7 @@ Verified files: `apps/web/lib/wavesco/lead-engine.ts` (apiGet/apiPost, getLeadSt
 ## 6 — Modules
 
 **Deployed modules (verified `modules/`):**
-- `acquisition-os@1.0.0` (`modules/acquisition-os/module.contract.json`): entry `app/(dashboard)/acquisition`, requiresEnv `[LEAD_ENGINE_ROOT, N8N_BASE_URL]`, tables `[GenerationBatch, Campaign, OutreachEmail, FollowUp, ActivityEvent, LeadResearch, OutreachOrder]` (7 declared; `LeadLifecycleEvent` + `IntegrationStatus` + `AuditLog` are platform-level but used), permissions `read/create/update/delete` on `acquisition`, audit true, 17 actions: `generateLeadsAction, createCampaignAction, submitCampaignAction, decideApprovalAction, upsertFollowUpAction, updateLeadOutreachAction, resendReportAction, researchLeadAction, checkLeadEmailAction, generateOutreachOrderAction, submitOrderAction, decideOrderAction, cancelOrderAction, batchResearchAction, batchCheckEmailsAction, batchGenerateOrdersAction, batchQueueReadyOrdersAction` (`modules/acquisition-os/module.contract.json:17-35`).
+- `acquisition-os@1.0.0` (`modules/acquisition-os/module.contract.json`): entry `app/(dashboard)/acquisition`, requiresEnv `[LEAD_ENGINE_ROOT, N8N_BASE_URL]`, tables `[GenerationBatch, Campaign, OutreachEmail, FollowUp, ActivityEvent, LeadResearch, OutreachOrder]` (7 declared) + **new canonical `AcquisitionProfile` + `AcquisitionDataImport` (Company Brief, tenant-isolated, no duplicate leads/campaigns)** (total 26 models now; `LeadLifecycleEvent` + `IntegrationStatus` + `AuditLog` platform-level), permissions `read/create/update/delete` on `acquisition`, audit true, 17 actions: `generateLeadsAction, createCampaignAction, submitCampaignAction, decideApprovalAction, upsertFollowUpAction, updateLeadOutreachAction, resendReportAction, researchLeadAction, checkLeadEmailAction, generateOutreachOrderAction, submitOrderAction, decideOrderAction, cancelOrderAction, batchResearchAction, batchCheckEmailsAction, batchGenerateOrdersAction, batchQueueReadyOrdersAction` (`modules/acquisition-os/module.contract.json:17-35`).
 - `automation-os@1.0.0` (`modules/automation-os/module.contract.json`): entry `app/(dashboard)/automation`, requiresEnv `[N8N_BASE_URL]`, tables `[IntegrationStatus]`, permissions `read/admin` on `automation`, audit true, actions `[refreshIntegrationStatusAction]`.
 - `client-os@1.0.0` (`modules/client-os/module.contract.json`): entry `app/(dashboard)/clients`, tables `[Client, OnboardingStep, Project, ProjectTask, Deliverable]`, permissions `read/create/update/delete` on `clients`, audit true, actions `[createClientAction, updateClientAction, toggleOnboardingStepAction, createProjectAction, updateTaskStatusAction, setDeliverableStatusAction]`.
 - `cafe-crm/cafe-inventory/cafe-leads/cafe-ops/cafe-orders`: directories exist under `modules/` but no `module.contract.json` → not registered as modules (empty scaffolds).
@@ -307,6 +314,10 @@ Verified files: `apps/web/lib/wavesco/lead-engine.ts` (apiGet/apiPost, getLeadSt
 - **Outreach planner agent** (OutreachOrder.plannerModel, AiUsageLog.operation enrich): generates `subject/body/followupPlan` on `LeadResearch → OutreachOrder`.
 
 - **Control plane:** `apps/web/app/(dashboard)/acquisition/agents/page.tsx` lists agents with enable/disable (`aiEnabled` toggle, masked credential), activity (AiUsageLog last 20), tool usage, failures, limits (rate/token); `POST /api/acquisition/agents/control` writes `AuditLog` with before/after; if gateway unreachable → FAIL, not fake.
+
+- **Acquisition Profile → Nemotron 3 Super (2026-09-02):** `lib/wavesco/acquisition-profile.ts:302 buildAgentContext(tenantId, profile, {integrationsHealth, leadStats, campaignsSummary}) → {company, objective, icp, offer, brand, existing_data:{importsSummary}, integrations:{refs,health}, constraints:rules, operating_preferences, current_state:{tenantId,profileId,status,readiness,activatedAt,version}, historical_context:{campaigns,leads,outreach,responses,performance,documents}, meta:{tenantId,profileVersion,generatedAt,model:"nemotron-3-super"}}`. Never includes `credentialRef`/`DATABASE_URL`/`api_key`; `maskUrl` + `redactSecrets`. Nemotron reasons/plans/orchestrates; deterministic services (`discovery`, `enrich_ai`, `excel_outreach`, `pdf_report`, `notify`, `withTenantContext` queries) execute; results return to OS state, persisted, audited. Large context is architectural — structured layer, not dump.
+
+- **Control Center profile:** `app/(dashboard)/acquisition/profile/page.tsx` (Company→Objective→ICP→Data→Offer→Brand→Integrations→Rules → Brief review → readiness checklist → Activate/Pause/Resume/Suspend) + `POST /api/acquisition/profile/control` state machine `DRAFT→INCOMPLETE→READY→ACTIVE→PAUSED→SUSPENDED` (deterministic, `nextStatusForAction`, audited).
 
 ## 8 — Workflows
 
@@ -421,7 +432,7 @@ Live Vercel (`vercel env ls` 2026-09-02): `DATABASE_URL, DIRECT_URL, NEXTAUTH_UR
 
 - **RLS:** runtime role `wavesco_app` does NOT own tables, so row-level security (applied in migrations `20260825010000_wavesco_product_models`) is enforced. App never queries outside `withTenantContext(tenantId, tx => ...)` which `SET LOCAL app.tenant_id`.
 
-- **Count:** 24 models: `Tenant, User, RefreshToken, Module, TenantModule, AuditLog, IdempotencyKey, VerificationToken, GenerationBatch, Campaign, OutreachEmail, FollowUp, LeadResearch, OutreachOrder, LeadLifecycleEvent, ActivityEvent, Client, OnboardingStep, Project, ProjectTask, Deliverable, IntegrationStatus, ClientAiConfig, AiUsageLog`.
+- **Count:** 26 models: `Tenant, User, RefreshToken, Module, TenantModule, AuditLog, IdempotencyKey, VerificationToken, GenerationBatch, Campaign, OutreachEmail, FollowUp, LeadResearch, OutreachOrder, LeadLifecycleEvent, ActivityEvent, Client, OnboardingStep, Project, ProjectTask, Deliverable, IntegrationStatus, ClientAiConfig, AiUsageLog, AcquisitionProfile, AcquisitionDataImport` (added 2026-09-02 — canonical Company Acquisition Profile, one per tenant `@@unique[tenantId]`, RLS `acquisitionprofile_isolation`).
 
 - **Lead Engine local mirror:** SQLite `D:\wavesco-lead-engine\data\leads.db` (tables `leads, runs`) — never duplicated into Postgres; `lead-engine.ts` reads live (`DatabaseSync busy_timeout 3000`), writes only `updateLeadOutreachState`.
 
@@ -446,8 +457,44 @@ Live Vercel (`vercel env ls` 2026-09-02): `DATABASE_URL, DIRECT_URL, NEXTAUTH_UR
 - `OutreachOrder`: `id, tenantId, version 1, leadKey @@unique([tenantId,leadKey,version]), businessName, email VERIFIED, researchSnapshot Json, subject/body, followupPlan Json, status READY_FOR_APPROVAL (READY_FOR_APPROVAL→PENDING→APPROVED→SENT→DELIVERED/FAILED, REJECTED/CANCELLED), aiEnabled/aiModel/enrichmentStatus/selectedService/personalizationContext`.
 - `LeadLifecycleEvent`: `id, tenantId, leadKey, batchId, stage, status, reason, aiProvider/aiModel, emailStatus, eligibility, orderId FK`.
 - `ActivityEvent/IntegrationStatus/ClientAiConfig/AiUsageLog`: as per schema 348-492.
+- `AcquisitionProfile`: `id, tenantId @unique, status DRAFT|INCOMPLETE|READY|ACTIVE|PAUSED|SUSPENDED @default DRAFT, version 1, companyName/website/industry/whatWeSell/productsServices Json/locationsServed Json/businessModel, acquisitionObjective/primaryObjective/targetQuantity/targetTimeframe/priorityProductService, icp Json {targetCustomer,b2bB2c,industry,companySize,decisionMakerTitles,geography,characteristics,buyingSignals,disqualifiers}, offer Json {productService,pricing,valueProp,promotions,cta,differentiators,proof}, brand Json {brandInfo,toneOfVoice,messagingPrefs,existingCopy,caseStudies,claimsProof,avoidSaying}, integrations Json {crm,email,calendar,website,whatsapp,other} refs only, rules Json {geoRestrictions,industriesExclude,customerTypesExclude,outreachRestrictions,approvalRequirements,businessRules,complianceConstraints,operationalLimits:{daily,monthly}}, readiness Json, activatedAt/pausedAt/suspendedAt, dataImports[]`.
+- `AcquisitionDataImport`: `id, tenantId, profileId FK CASCADE, fileName, fileType csv|excel|json, rowCount, status pending|processed|failed, summary Json, error, createdAt`.
+
 
 **EngineLead (SQLite):** `id, business, category, area, city, phone/whatsapp/email/website/instagram, rating, reviews, digital_score/lead_score, tier, problem/opportunity/reason/outreach_angle, source_urls, verification, site_class, status, email_status, date_contacted, reply_status, opted_out/bounced, next_follow_up, name_key, batch_id, first_discovered/last_researched, ai_* fields`.
+
+
+## 14a — Acquisition Brief / Company Acquisition Profile (2026-09-02)
+
+**Canonical client business context — one per tenant `@@unique[tenantId]`, tenant-isolated via RLS `acquisitionprofile_isolation`, no duplicate leads/campaigns.**
+
+**Commercial:** One Acquisition OS, no Starter/Growth/Pro, no feature gating — “Choose. Rent. Operate.” Client gets complete OS while rental active (`status=ACTIVE`). `Tenant.plan` not gating.
+
+**8 groups:**
+1. **Company:** `companyName` (required), `website` (required), `industry` (required), `whatWeSell` (required), `productsServices Json`, `locationsServed Json`, `businessModel` (B2B/B2C)
+2. **Objective:** `acquisitionObjective` (required, leads/meetings/customers/sales), `primaryObjective` (required), `targetQuantity`, `targetTimeframe`, `priorityProductService`
+3. **ICP:** `icp Json` {`targetCustomer` (required), `b2bB2c`, `industry`, `companySize`, `decisionMakerTitles`, `geography` (required), `characteristics`, `buyingSignals`, `disqualifiers`}
+4. **Existing Data:** `AcquisitionDataImport` `{fileName, fileType csv|excel|json, rowCount, summary, status}` — audited, never raw PII dump, tenant-scoped
+5. **Offer:** `offer Json` {`productService` (required) or `valueProp`, `pricing`, `valueProp`, `promotions`, `cta`, `differentiators`, `proof`}
+6. **Brand:** `brand Json` {`brandInfo`, `toneOfVoice`, `messagingPrefs`, `existingCopy`, `caseStudies`, `claimsProof`, `avoidSaying`}
+7. **Infrastructure:** `integrations Json` {`crm`,`email`,`calendar`,`website`,`whatsapp`,`other`} — refs only, never credentials; health via `getIntegrationsHealth` masked
+8. **Rules:** `rules Json` {`geoRestrictions`, `industriesExclude`, `customerTypesExclude`, `outreachRestrictions`, `approvalRequirements`, `businessRules`, `complianceConstraints`, `operationalLimits:{daily,monthly}`}
+
+**Flow:** Company → Objective → ICP → Data → Offer → Brand → Integrations → Rules → **Acquisition Brief** → **Operational Context** → **Nemotron 3 Super** → Discover→Enrich→Verify→Qualify→Score→Segment→Outreach→Follow-up→Analyze→Optimize → Results
+
+**UX principle:** Client never configures agents/prompts/workflows/scoring/enrichment/routing/tools/model/orchestration — OS does.
+
+**Validation:** `validateProfileInput` strips unknown top-level keys (`agents`, `prompts` etc.), validates `website` http(s) and `targetQuantity>=0`, redacts `api_key/secret/token/credentialRef` inside Json before persist (shallow+one-level deep).
+
+**States:** `DRAFT` (empty) → `INCOMPLETE` (some required missing) → `READY` (all 9 required present) → `ACTIVE` (activate) → `PAUSED`/`SUSPENDED` → resume → `ACTIVE`. Transitions via `nextStatusForAction` deterministic, `canTransition`.
+
+**APIs:** `GET/POST/PATCH /api/acquisition/profile` (upsert, auto `DRAFT→READY`), `POST /api/acquisition/profile/control {activate|pause|resume|suspend}`, `GET /api/acquisition/profile/context` (masked), `POST/GET /api/acquisition/profile/import` (audited).
+
+**UI:** `/acquisition/profile` — 8 `ProfileQuickForm` (dot-notation `icp.targetCustomer`→Json merge), `DataImportControl`, `Integrations` health masked, `ACQUISITION BRIEF — review` JSON, `Agent context — Nemotron 3 Super` preview, `ProfileLifecycleControls` with confirm, `AutoRefresh 15s`, `StatusPill live/error/disconnected`.
+
+**Security:** `credentialRef env:VAR` only, never raw keys in brief; `withTenantContext` + `@@unique[tenantId]` + `ENABLE ROW LEVEL SECURITY` + `GRANT wavesco_app`; every mutation `auditControl` before/after + `ActivityEvent`.
+
+**Agent context:** `company/objective/icp/offer/brand/existing_data/integrations/constraints/operating_preferences/current_state/historical_context/meta` — `maskUrl` + `redactSecrets`, `meta.model="nemotron-3-super"`.
 
 ## 15 — Authentication
 
@@ -947,8 +994,8 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 |-----------|--------|--------|---------------|
 | Control Center (app.wavesco.in) | READY | 10 dashboard pages + 10 control APIs + System health/logs/errors/jobs/queues/db/config/audit — all `force-dynamic`, `requireControlAuth`, AuditLog per action, SWR 15–30s, ConfirmDialog | 2026-09-02 (HEAD 5255c56, 103 tests) |
 | Lead Engine dual-mode | READY (local) / SET (remote) | Local: `D:\wavesco-lead-engine\data\leads.db` True, `engine/` 10 tools verified; Remote: `LEAD_ENGINE_MODE=remote` + `LEAD_ENGINE_API_URL Hidden SET` (vercel 6d ago) | 2026-09-02 |
-| DB (Neon + RLS) | READY | `schema.prisma` 24 models, `wavesco_app` RLS, `withTenantContext SET LOCAL app.tenant_id`, `DATABASE_URL/DIRECT_URL` both SET | 2026-09-02 |
-| Module contract | READY | `acquisition-os@1.0.0` 7 tables declared (Platform 24 total) + 17 actions, audit true, requiresEnv LEAD_ENGINE_ROOT,N8N_BASE_URL; `automation-os` + `client-os` also registered | 2026-09-02 |
+| DB (Neon + RLS) | READY | `schema.prisma` 26 models (+AcquisitionProfile, AcquisitionDataImport), `wavesco_app` RLS (`acquisitionprofile_isolation`), `withTenantContext SET LOCAL app.tenant_id`, `DATABASE_URL/DIRECT_URL` both SET | 2026-09-02 |
+| Module contract | READY | `acquisition-os@1.0.0` 7 tables declared + canonical `AcquisitionProfile`/`AcquisitionDataImport` (Platform 26 total) + 17 actions, audit true, requiresEnv LEAD_ENGINE_ROOT,N8N_BASE_URL; `automation-os` + `client-os` hidden from nav (Acquisition OS only) | 2026-09-02 |
 | n8n | BLOCKED (prod) | `N8N_BASE_URL` missing in vercel prod → health `BLOCKED: N8N_BASE_URL missing`; fallback manifest `D:\n8n-personal-automations\workflows-manifest.json` | 2026-09-02 |
 | Brevo/SMTP | BLOCKED (prod) | `BREVO_API_KEY` missing → `BLOCKED: BREVO_API_KEY missing`; SMTP `Personal - SMTP` placeholder in n8n | 2026-09-02 |
 | AI Gateway | READY | `ClientAiConfig.credentialRef env:OPENAI_API_KEY`, Ollama Cloud `https://ollama.com/v1` gemma4:31b, `vercel env SET OPENAI_*`; `AiUsageLog` ledger | 2026-09-02 |
@@ -967,6 +1014,7 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 | `/acquisition/integrations` | READY | matrix with health + Test Connection masked; BLOCKED pills | 2026-09-02 |
 | `/acquisition/reports` (Documents) | READY | generation+download+lineage | 2026-09-02 |
 | `/acquisition/email` + `/outreach` | READY | email templates + delivery states + queue | 2026-09-02 |
+| `/acquisition/profile` | READY | Company→Objective→ICP→Data→Offer→Brand→Integrations→Rules → Brief → readiness checklist → Activate/Pause/Resume/Suspend → Nemotron context masked | 2026-09-02 |
 | `/acquisition/analytics` | READY | funnel + costs; empty tenant → zeros | 2026-09-02 |
 | `/system` | READY | health/logs/errors/jobs/queues/db/config/audit 7 sections | 2026-09-02 |
 | Lead Engine remote | SET | `LEAD_ENGINE_API_URL Hidden SET` (remote), mode `remote`; local `data/leads.db` True | 2026-09-02 |
@@ -989,7 +1037,9 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 | 11 | ANALYTICS | DONE | `7a03762` |
 | 12 | SYSTEM | DONE | `ec0fa53` |
 | 13 | Real-Time + Polish | DONE | `5255c56` |
-| 14 | Dossier Complete + Docs + E2E + Deploy | DONE | `HEAD (to deploy)` — 103 tests, 44/44 filled |
+| 14 | Dossier Complete + Docs + E2E + Deploy | DONE | `HEAD 5255c56` — 103 tests, 44/44 filled |
+| 15 | Acquisition Brief / Company Profile | DONE | `28009bf` — 133 tests, 26 models, rented OS no tiers, Nemotron context, readiness, lifecycle |
+| 16 | Migrate + Cleanup | DONE | `7363bd5` — manual DDL via DIRECT_URL, 15 statements, migrate route removed |
 
 ### Integration Status
 
@@ -1026,8 +1076,10 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 | `pipeline-email-check.test.ts` | PASS | 2026-09-02 06:34 | 10 tests |
 | `email-verify.test.ts` | PASS | 2026-09-02 06:34 | 5 tests |
 | `integrations.test.ts` | PASS | 2026-09-02 06:34 | 2 tests |
+| `acquisition-profile.test.ts` | PASS | 2026-09-02 10:40 | 21 tests — create/update/isolation/readiness/activate/import/audit/context/redact |
+| `e2e/acquisition-profile-flow.test.ts` | PASS | 2026-09-02 10:40 | 9 tests — Company→Brief→Readiness→Activate→Context→Import→Pause→Audit→isolation |
 | `e2e/acquisition-flow.test.ts` | PASS | 2026-09-02 06:34 | 3 tests — discover→audit or BLOCKED |
-| **Total** | **17 suites PASS** | 2026-09-02 06:34 | **103 tests passed 0 failed** (`pnpm --filter web test`) |
+| **Total** | **19 suites PASS** | 2026-09-02 10:40 | **133 tests passed 0 failed** (`pnpm --filter web test`) |
 
 ### Deployment Status
 
@@ -1040,4 +1092,4 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 
 ---
 
-*Dossier completed 2026-09-02 by Task 14 agent. Evidence: `git status/diff/log --oneline -10`, `modules/acquisition-os+automation-os+client-os/module.contract.json`, `packages/db/prisma/schema.prisma:1-492`, `apps/web/lib/wavesco/*`, `apps/web/app/(dashboard)/*`, `apps/web/app/api/acquisition/*|system/*`, `wavesco-lead-engine/config.json + engine/ ls`, `vercel ls/inspect/env ls`, `pnpm --filter web test` (103 tests). No secrets stored. BLOCKED/NOT TESTED states faithfully marked; no fake PASS.*
+*Dossier updated 2026-09-02 — Acquisition Brief / Company Profile (Choose. Rent. Operate., Nemotron 3 Super, readiness, lifecycle) — 133 tests. Prior: completed 2026-09-02 by Task 14 agent. Evidence: `git status/diff/log --oneline -10`, `modules/acquisition-os+automation-os+client-os/module.contract.json`, `packages/db/prisma/schema.prisma:1-492`, `apps/web/lib/wavesco/*`, `apps/web/app/(dashboard)/*`, `apps/web/app/api/acquisition/*|system/*`, `wavesco-lead-engine/config.json + engine/ ls`, `vercel ls/inspect/env ls`, `pnpm --filter web test` (103 tests). No secrets stored. BLOCKED/NOT TESTED states faithfully marked; no fake PASS.*
