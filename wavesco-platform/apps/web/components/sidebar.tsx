@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Mail,
+  Package,
   Radar,
   Settings,
   Sparkles,
@@ -37,6 +38,10 @@ export function Sidebar({ internalAccess = true }: { internalAccess?: boolean })
   const pathname = usePathname();
 
   const sections: NavSection[] = [
+    {
+      title: "Waves",
+      items: [{ href: "/products", label: "Your Products", icon: Package }],
+    },
     {
       title: "",
       items: [{ href: "/command", label: "Command Center", icon: LayoutDashboard }],

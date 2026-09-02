@@ -5,6 +5,7 @@ const PROTECTED_PREFIXES = [
   "/command",
   "/overview",
   "/acquisition",
+  "/products",
   "/clients",
   "/automation",
   "/intelligence",
@@ -66,13 +67,41 @@ export async function middleware(request: NextRequest) {
 
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   if (isProtected && !isAuthenticated) {
-    const loginUrl = new URL("/login", request.nextUrl);
+    // Waves identity: app.wavesco.in has no independent login — redirect to main Waves site
+    const wavesMain = (process.env.WAVES_MAIN_URL || "https://wavesco.in").replace(/\/$/, "");
+    const host = request.headers.get("host") || request.nextUrl.host || "";
+    const isAppHost = host.includes("app.wavesco.in") || host.includes("app.wavesco") ;
+    const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
     const callback = pathname + request.nextUrl.search;
-    if (callback !== "/login" && callback !== "/signup" && !callback.startsWith("/login?") && !callback.startsWith("/signup?")) {
-      loginUrl.searchParams.set("callbackUrl", callback);
+    const hasValidCallback =
+      callback !== "/login" &&
+      callback !== "/signup" &&
+      !callback.startsWith("/login?") &&
+      !callback.startsWith("/signup?");
+    // Only use cross-domain handoff in production app host; local dev keeps local /login for testability
+    const useWavesLogin = isAppHost && !isLocal && wavesMain.startsWith("https://");
+    let loginUrl: URL;
+    if (useWavesLogin) {
+      // Validate callbackUrl destination is same app host to prevent open redirect
+      const appOrigin = `${request.nextUrl.protocol}//${host}`;
+      const intended = hasValidCallback ? new URL(callback, appOrigin).toString() : appOrigin + "/command";
+      // Only allow *.wavesco.in destinations
+      let safeCallback = intended;
+      try {
+        const dest = new URL(intended);
+        const allowed = ["wavesco.in", "app.wavesco.in", "www.wavesco.in"];
+        const ok = allowed.some((h) => dest.hostname === h || dest.hostname.endsWith(`.${h}`));
+        if (!ok) safeCallback = `${appOrigin}/command`;
+      } catch {
+        safeCallback = `${appOrigin}/command`;
+      }
+      loginUrl = new URL("/login", wavesMain);
+      loginUrl.searchParams.set("callbackUrl", safeCallback);
+    } else {
+      loginUrl = new URL("/login", request.nextUrl);
+      if (hasValidCallback) loginUrl.searchParams.set("callbackUrl", callback);
     }
     const res = NextResponse.redirect(loginUrl);
-    // If a stale invalid session cookie exists, clear it to break loops
     if (token === null && request.cookies.has("authjs.session-token")) {
       res.cookies.set("authjs.session-token", "", { maxAge: 0, path: "/" });
       res.cookies.set("__Secure-authjs.session-token", "", { maxAge: 0, path: "/" });

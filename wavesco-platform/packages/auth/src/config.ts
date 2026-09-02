@@ -69,6 +69,20 @@ export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   pages: { signIn: "/login", newUser: "/signup" },
   trustHost: true,
+  cookies: process.env.NEXTAUTH_COOKIE_DOMAIN
+    ? {
+        sessionToken: {
+          name: "__Secure-authjs.session-token",
+          options: {
+            domain: process.env.NEXTAUTH_COOKIE_DOMAIN,
+            httpOnly: true,
+            sameSite: "lax",
+            path: "/",
+            secure: true,
+          },
+        },
+      }
+    : undefined,
   providers: [
     Credentials({
       name: "Email + Password",
@@ -110,6 +124,20 @@ export const authConfig: NextAuthConfig = {
     }),
   ],
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // Allow relative URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      try {
+        const dest = new URL(url);
+        const base = new URL(baseUrl);
+        if (dest.origin === base.origin) return url;
+        const allowed = ["wavesco.in", "app.wavesco.in", "www.wavesco.in", "dev.wavesco.in", "localhost", "127.0.0.1"];
+        const host = dest.hostname;
+        const isAllowed = allowed.some((h) => host === h || host.endsWith(`.${h}`) || host === "localhost");
+        if (isAllowed) return url;
+      } catch {}
+      return baseUrl;
+    },
     jwt({ token, user, trigger }) {
       // Auth.js v5 lifecycle:
       //   sign-in: jwt({ token, user, account, profile })

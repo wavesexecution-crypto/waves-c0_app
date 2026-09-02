@@ -553,3 +553,22 @@ model AcquisitionDataImport {
   @@index([tenantId, status])
   @@map("AcquisitionDataImport")
 }
+
+// --- Waves Identity — cross-site handoff (single-use, short-lived, cryptographically protected) ---
+// Used for explicit "Open App" handoff when shared cookie is not present.
+// The JWT itself is signed with JWT_SECRET/AUTH_SECRET, carries jti, aud=app.wavesco.in, destination.
+// The row tracks single-use and prevents replay; handoff never puts secrets in URL query.
+model WavesHandoffToken {
+  id          String    @id @default(cuid())
+  jti         String    @unique
+  tenantId    String
+  userId      String
+  destination String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@map("WavesHandoffToken")
+}
