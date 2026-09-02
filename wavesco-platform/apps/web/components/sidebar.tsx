@@ -9,19 +9,14 @@ import {
   BookOpen,
   Brain,
   FileText,
-  Gauge,
   Handshake,
   LayoutDashboard,
   ListChecks,
   Mail,
-  Plug,
   Radar,
-  ScrollText,
   Settings,
   Sparkles,
   Target,
-  Users,
-  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@wavesco/ui";
@@ -59,23 +54,6 @@ export function Sidebar({ internalAccess = true }: { internalAccess?: boolean })
         { href: "/acquisition/reports", label: "Reports", icon: FileText },
       ],
     },
-    {
-      title: "Client OS",
-      items: [{ href: "/clients", label: "Clients", icon: Users }],
-    },
-    ...(internalAccess
-      ? ([
-          {
-            title: "Automation OS",
-            items: [
-              { href: "/automation/workflows", label: "Workflows", icon: Workflow },
-              { href: "/automation/health", label: "Health", icon: Gauge },
-              { href: "/automation/integrations", label: "Integrations", icon: Plug },
-              { href: "/automation/logs", label: "Logs", icon: ScrollText },
-            ],
-          },
-        ] as NavSection[])
-      : []),
     {
       title: "Intelligence",
       items: [
