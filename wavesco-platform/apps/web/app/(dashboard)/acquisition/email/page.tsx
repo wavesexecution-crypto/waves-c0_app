@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { TestConnectionButton } from "@/components/acquisition/integrations-controls";
 import { EmailTemplateControls } from "@/components/acquisition/email-template-controls";
 import { brevoHealth, getIntegrationsHealth } from "@/lib/wavesco/integrations";
@@ -161,6 +162,7 @@ export default async function EmailControlPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AutoRefresh intervalMs={15_000} />
           <StatusPill state={brevoStatus === "ok" ? "connected" : brevoStatus === "BLOCKED" ? "disconnected" : "error"} />
           <span className="text-xs uppercase tracking-widest text-muted-foreground">Brevo {brevoStatus}</span>
         </div>

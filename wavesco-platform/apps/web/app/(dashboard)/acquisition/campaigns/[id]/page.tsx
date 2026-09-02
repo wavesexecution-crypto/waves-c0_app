@@ -7,6 +7,7 @@ import { withTenantContext } from "@wavesco/db";
 import { selectCampaignCandidates } from "@/lib/wavesco/lead-engine";
 import { StatusPill } from "@/components/command/primitives";
 import { CampaignControls } from "@/components/acquisition/campaign-controls";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
 
 export const dynamic = "force-dynamic";
@@ -82,8 +83,9 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           <p className="mt-1 text-xs text-muted-foreground">Created {formatIST(campaign.createdAt)} · ID {campaign.id}</p>
         </div>
         <div className="flex flex-col items-end gap-2">
+          <AutoRefresh intervalMs={5_000} />
           <StatusPill state={pillState(campaign.status)} />
-          <span className="rounded-full border px-2 py-0.5 text-xs font-mono uppercase">{campaign.status}</span>
+          <span className="rounded-full border px-2 py-0.5 text-xs font-mono uppercase">{campaign.status === "running" ? "● running" : campaign.status}</span>
         </div>
       </div>
 

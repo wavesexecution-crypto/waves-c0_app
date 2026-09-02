@@ -7,6 +7,7 @@ import { getFacets } from "@/lib/wavesco/lead-engine";
 import { classifyEmail, type EmailStatus } from "@/lib/wavesco/outreach-logic";
 import { listPipelineLeads } from "@/lib/wavesco/pipeline";
 import { MetricCard, SectionHeader, StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
 import { BatchPanel, LeadStageButtons, OrderButtons } from "@/components/acquisition/pipeline-actions";
 
@@ -210,19 +211,25 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Outreach Pipeline</h1>
-        <p className="text-sm text-muted-foreground">
-          Lead Intelligence → Research → Email Check → Individual Outreach Orders → Approval Queue →
-          existing cold-email infrastructure → Follow-ups. Every number below is computed from the live
-          corpus and database — zero means zero.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Outreach Pipeline</h1>
+          <p className="text-sm text-muted-foreground">
+            Lead Intelligence → Research → Email Check → Individual Outreach Orders → Approval Queue →
+            existing cold-email infrastructure → Follow-ups. Every number below is computed from the live
+            corpus and database — zero means zero.
+          </p>
+        </div>
+        <AutoRefresh intervalMs={10_000} />
       </div>
 
       {corpusError ? (
         <div className="rounded-lg border border-dashed border-red-500/40 p-6 text-sm">
           <p className="font-medium">Lead Engine unavailable</p>
           <p className="text-muted-foreground">{corpusError}</p>
+          <a href="/acquisition/pipeline" className="mt-3 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            Retry
+          </a>
         </div>
       ) : (
         <>

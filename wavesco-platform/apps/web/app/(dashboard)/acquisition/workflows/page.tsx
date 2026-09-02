@@ -4,6 +4,7 @@ import { requireTenantId } from "@/lib/tenant";
 import { n8nHealth, maskUrl } from "@/lib/wavesco/integrations";
 import { getWorkflows, getExecutions, readAutomationManifest, n8nBaseUrl } from "@/lib/wavesco/n8n";
 import { StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { WorkflowControls, WorkflowHistoryButton } from "@/components/acquisition/workflow-controls";
 
 export const dynamic = "force-dynamic";
@@ -112,6 +113,7 @@ export default async function WorkflowsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AutoRefresh intervalMs={10_000} />
           <StatusPill state={isBlocked ? "disconnected" : fallback ? "degraded" : error ? "error" : "connected"} />
           <span className="text-xs text-muted-foreground">{isBlocked ? "BLOCKED" : fallback ? "FALLBACK MANIFEST" : error ? "ERROR" : "LIVE"}</span>
         </div>
@@ -139,6 +141,9 @@ export default async function WorkflowsPage() {
           <p className="font-medium text-red-600 dark:text-red-400">Workflows unreachable</p>
           <p className="text-xs text-muted-foreground">{error}</p>
           <p className="mt-1 text-[11px] text-muted-foreground">Base: {masked} · Verify n8n instance and API key via Integrations → Test Connection.</p>
+          <a href="/acquisition/workflows" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            Retry
+          </a>
         </div>
       ) : null}
 
@@ -177,7 +182,12 @@ export default async function WorkflowsPage() {
           </table>
         </div>
       ) : workflows.length === 0 && !error ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No workflows found. If n8n is configured, verify API key has workflow read access.</div>
+        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          <p>No workflows found. If n8n is configured, verify API key has workflow read access.</p>
+          <a href="/acquisition/integrations" className="mt-3 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            Test n8n Connection
+          </a>
+        </div>
       ) : workflows.length > 0 ? (
         <div className="space-y-4">
           <div className="overflow-x-auto rounded-lg border bg-card">

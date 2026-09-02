@@ -5,6 +5,7 @@ import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { getIntegrationsHealth, maskUrl } from "@/lib/wavesco/integrations";
 import { MetricCard, SectionHeader, StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "System — Acquisition OS" };
@@ -305,6 +306,7 @@ export default async function SystemPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AutoRefresh intervalMs={15_000} />
           <StatusPill state={healthError ? "error" : dbError ? "degraded" : hasErrors ? "error" : "connected"} />
           <span className="text-xs uppercase tracking-widest text-muted-foreground">
             {healthError ? "ERROR" : dbError ? "DEGRADED" : hasErrors ? "ERRORS" : "LIVE"}
@@ -316,12 +318,18 @@ export default async function SystemPage({
         <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs">
           <p className="font-medium text-red-600 dark:text-red-400">Health probe failed</p>
           <p className="text-muted-foreground">{healthError.slice(0, 300)}</p>
+          <a href="/system" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            Retry
+          </a>
         </div>
       ) : null}
       {dbError ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
           <p className="font-medium text-amber-700 dark:text-amber-300">Tenant DB aggregation warning</p>
           <p className="text-muted-foreground">{dbError.slice(0, 300)}</p>
+          <a href="/system" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            Retry
+          </a>
         </div>
       ) : null}
 

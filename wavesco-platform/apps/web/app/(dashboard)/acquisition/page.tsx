@@ -5,6 +5,7 @@ import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { getFacets, getLeadStats, getLastEngineRun } from "@/lib/wavesco/lead-engine";
 import { MetricCard, SectionHeader, StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST, relativeFrom } from "@/lib/wavesco/time";
 import { OverviewLive } from "@/components/acquisition/overview-live";
 
@@ -46,11 +47,14 @@ export default async function AcquisitionPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Acquisition OS</h1>
-        <p className="text-sm text-muted-foreground">
-          Control layer over the existing Lead Engine, Approval Queue / Email Outbox and Notify Hub.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Acquisition OS</h1>
+          <p className="text-sm text-muted-foreground">
+            Control layer over the existing Lead Engine, Approval Queue / Email Outbox and Notify Hub.
+          </p>
+        </div>
+        <AutoRefresh intervalMs={30_000} />
       </div>
 
       <section className="space-y-3">
@@ -71,6 +75,12 @@ export default async function AcquisitionPage() {
             <p className="font-medium">Lead Engine unavailable</p>
             <p className="text-muted-foreground">{statsError}</p>
             <p className="mt-1 text-xs text-muted-foreground">The lead database is temporarily unavailable. Metrics will return automatically.</p>
+            <div className="mt-3 flex items-center gap-2">
+              <a href="/acquisition" className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+                Retry
+              </a>
+              <span className="text-[11px] text-muted-foreground">Live polling every 30s — will recover automatically</span>
+            </div>
           </div>
         )}
       </section>

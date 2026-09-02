@@ -4,6 +4,7 @@ import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { getLeadStats } from "@/lib/wavesco/lead-engine";
 import { MetricCard, SectionHeader, StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Analytics — Acquisition OS" };
@@ -401,6 +402,7 @@ export default async function AnalyticsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AutoRefresh intervalMs={30_000} />
           <StatusPill state={acquisitionError ? "error" : hasData ? "connected" : "unavailable"} />
           <span className="text-xs uppercase tracking-widest text-muted-foreground">{acquisitionError ? "ERROR" : hasData ? "LIVE" : "EMPTY"}</span>
         </div>
@@ -410,12 +412,18 @@ export default async function AnalyticsPage() {
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
           <p className="font-medium text-amber-800 dark:text-amber-200">Lead Engine unreachable — acquisition metrics zeroed</p>
           <p className="text-muted-foreground">{acquisitionError.slice(0, 300)}</p>
+          <a href="/acquisition/analytics" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            Retry
+          </a>
         </div>
       ) : null}
       {dbError ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs">
           <p className="font-medium text-red-600 dark:text-red-400">Tenant DB aggregation warning</p>
           <p className="text-muted-foreground">{dbError.slice(0, 300)}</p>
+          <a href="/acquisition/analytics" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            Retry
+          </a>
         </div>
       ) : null}
 

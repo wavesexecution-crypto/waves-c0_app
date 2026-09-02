@@ -4,6 +4,7 @@ import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { maskUrl } from "@/lib/wavesco/integrations";
 import { StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { AgentToggle, AgentConfigureForm } from "@/components/acquisition/agent-controls";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +88,7 @@ export default async function AgentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AutoRefresh intervalMs={15_000} />
           <StatusPill state={gatewayPill} />
           <span className="text-xs uppercase tracking-widest text-muted-foreground">
             {gatewayStatus === "ok" ? "LIVE" : gatewayStatus === "disabled" ? "DISABLED" : gatewayStatus === "not_configured" ? "NOT CONFIGURED" : "ERROR"}
@@ -98,6 +100,9 @@ export default async function AgentsPage() {
         <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 text-sm">
           <p className="font-medium text-red-600 dark:text-red-400">Failed to load gateway state</p>
           <p className="text-xs text-muted-foreground">{loadError}</p>
+          <a href="/acquisition/agents" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            Retry
+          </a>
         </div>
       ) : null}
 

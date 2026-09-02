@@ -5,6 +5,7 @@ import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { DecideButtons } from "@/components/acquisition/submit-panel";
 import { StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
 
 export const dynamic = "force-dynamic";
@@ -99,7 +100,8 @@ export default async function OutreachPage() {
             Pipeline over the existing production path: Approval Queue → Email Outbox → SMTP. Approve or reject here or via Telegram — both reach the same delivery pipeline. Delivery state is tenant-scoped and audit-logged.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <AutoRefresh intervalMs={10_000} />
           <Link href="/acquisition/email" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             Email Control
           </Link>

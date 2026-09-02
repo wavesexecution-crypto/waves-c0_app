@@ -8,6 +8,7 @@ import { CampaignCreateForm } from "@/components/acquisition/campaign-form";
 import { CampaignSubmitPanel } from "@/components/acquisition/submit-panel";
 import { CampaignControls } from "@/components/acquisition/campaign-controls";
 import { StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
 
 export const dynamic = "force-dynamic";
@@ -165,6 +166,7 @@ export default async function CampaignsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AutoRefresh intervalMs={10_000} />
           <Link href="#new-campaign" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             + Create
           </Link>
@@ -191,6 +193,9 @@ export default async function CampaignsPage() {
           <div className="rounded-lg border border-dashed border-red-500/40 p-4 text-sm">
             <p className="font-medium">Cannot build segments — Lead Engine unavailable</p>
             <p className="text-xs text-muted-foreground">{engineError}</p>
+            <a href="/acquisition/campaigns" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+              Retry
+            </a>
           </div>
         ) : (
           <CampaignCreateForm cities={facets.cities} categories={facets.categories} />
@@ -201,7 +206,10 @@ export default async function CampaignsPage() {
         <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Campaigns</h2>
         {campaigns.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No campaigns yet. Create one above — eligibility is verified before anything can be queued.
+            <p>No campaigns yet. Create one above — eligibility is verified before anything can be queued.</p>
+            <Link href="#new-campaign" className="mt-3 inline-block rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+              Create First Campaign
+            </Link>
           </div>
         ) : (
           <div className="space-y-3">

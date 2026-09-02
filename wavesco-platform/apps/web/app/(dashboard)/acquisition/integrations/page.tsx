@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { getIntegrationsHealth } from "@/lib/wavesco/integrations";
 import { StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { TestConnectionButton } from "@/components/acquisition/integrations-controls";
 import { withTenantContext } from "@wavesco/db";
 
@@ -79,6 +80,7 @@ export default async function IntegrationsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AutoRefresh intervalMs={30_000} />
           <StatusPill state={blocked.length > 0 ? "disconnected" : hasError ? "error" : "connected"} />
           <span className="text-xs uppercase tracking-widest text-muted-foreground">
             {blocked.length > 0 ? `BLOCKED (${blocked.length})` : hasError ? "ERROR" : "LIVE"}
@@ -90,6 +92,9 @@ export default async function IntegrationsPage() {
         <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 text-sm">
           <p className="font-medium text-red-600 dark:text-red-400">Failed to load integrations health</p>
           <p className="text-xs text-muted-foreground">{loadError}</p>
+          <a href="/acquisition/integrations" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            Retry
+          </a>
         </div>
       ) : null}
 

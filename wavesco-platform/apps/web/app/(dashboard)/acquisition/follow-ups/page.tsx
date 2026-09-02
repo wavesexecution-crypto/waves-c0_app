@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { FollowUpForm, FollowUpRowActions } from "@/components/acquisition/follow-ups";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
 
 export const dynamic = "force-dynamic";
@@ -23,19 +24,25 @@ export default async function FollowUpsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Follow-ups</h1>
-        <p className="text-sm text-muted-foreground">
-          {pending.length} pending · {overdue.length} overdue. Reminders flow through the existing
-          Notify Hub when triggered by automations; this tracker is the source of record.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Follow-ups</h1>
+          <p className="text-sm text-muted-foreground">
+            {pending.length} pending · {overdue.length} overdue. Reminders flow through the existing
+            Notify Hub when triggered by automations; this tracker is the source of record.
+          </p>
+        </div>
+        <AutoRefresh intervalMs={10_000} />
       </div>
 
       <FollowUpForm />
 
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No follow-ups yet.
+          <p>No follow-ups yet.</p>
+          <Link href="/acquisition/pipeline" className="mt-3 inline-block rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+            Go to Pipeline
+          </Link>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border bg-card">

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { GeneratePanel } from "@/components/acquisition/generate-panel";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Lead Engine" };
@@ -21,11 +22,14 @@ export default async function GeneratePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Lead Engine</h1>
-        <p className="text-sm text-muted-foreground">
-          Trigger the real pipeline. Progress is tracked from the engine&apos;s own process and logs.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Lead Engine</h1>
+          <p className="text-sm text-muted-foreground">
+            Trigger the real pipeline. Progress is tracked from the engine&apos;s own process and logs.
+          </p>
+        </div>
+        <AutoRefresh intervalMs={5_000} />
       </div>
       <GeneratePanel lastRequestId={last?.requestId ?? null} />
     </div>

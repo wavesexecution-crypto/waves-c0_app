@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { getFacets, listLeads, type ListLeadsParams } from "@/lib/wavesco/lead-engine";
 import { LeadsExportButton } from "@/components/acquisition/leads-export-button";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Leads" };
@@ -75,9 +76,12 @@ export default async function LeadsPage({
             Live corpus from the Lead Engine database. Nothing is cached or copied.
           </p>
         </div>
-        <Link href="/acquisition/generate" className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
-          + Generate leads
-        </Link>
+        <div className="flex items-center gap-2">
+          <AutoRefresh intervalMs={15_000} />
+          <Link href="/acquisition/generate" className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
+            + Generate leads
+          </Link>
+        </div>
       </div>
 
       {/* Control bar — Discover / Import / Export / Segment */}
@@ -197,7 +201,15 @@ export default async function LeadsPage({
 
           {result.total === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-              No leads found{params.search ? ` for "${params.search}"` : ""}. Adjust filters or generate a new batch.
+              <p>No leads found{params.search ? ` for "${params.search}"` : ""}. Adjust filters or generate a new batch.</p>
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <Link href="/acquisition/generate" className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+                  Generate Leads
+                </Link>
+                <Link href="/acquisition/leads" className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+                  Clear Filters
+                </Link>
+              </div>
             </div>
           ) : (
             <>

@@ -5,6 +5,7 @@ import { withTenantContext } from "@wavesco/db";
 import { listBatchManifests } from "@/lib/wavesco/lead-engine";
 import { ResendButton } from "@/components/acquisition/resend-button";
 import { StatusPill } from "@/components/command/primitives";
+import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
 import { DocumentsGenerateControl } from "@/components/acquisition/documents-generate-button";
 
@@ -97,12 +98,15 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Documents — Generated Reports</h1>
-        <p className="text-sm text-muted-foreground">
-          View generated reports, generate new documents, download via tenant-scoped files, and inspect lineage (workflow + engine batch).
-          Every generation is audit-logged.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Documents — Generated Reports</h1>
+          <p className="text-sm text-muted-foreground">
+            View generated reports, generate new documents, download via tenant-scoped files, and inspect lineage (workflow + engine batch).
+            Every generation is audit-logged.
+          </p>
+        </div>
+        <AutoRefresh intervalMs={15_000} />
       </div>
 
       <DocumentsGenerateControl />
@@ -118,11 +122,15 @@ export default async function ReportsPage() {
           <div className="rounded-lg border border-dashed border-red-500/40 p-6 text-sm">
             <p className="font-medium">Generation history unavailable</p>
             <p className="text-muted-foreground">{historyError}</p>
+            <a href="/acquisition/reports" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+              Retry
+            </a>
           </div>
         ) : batches.length === 0 ? (
           <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            No generation batches yet. Use Generate above to queue the first document.
+            <p>No generation batches yet. Use Generate above to queue the first document.</p>
             <p className="mt-1 text-xs">Params example: category=Salon, city=Pune, tier=A, count=10 → queued.</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">Live polling every 15s — new batches appear automatically.</p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border bg-card">
@@ -217,10 +225,16 @@ export default async function ReportsPage() {
             <p className="font-medium">Report storage unavailable</p>
             <p className="text-muted-foreground">{manifestsError}</p>
             <p className="mt-1 text-xs text-muted-foreground">Produced by the lead research service</p>
+            <a href="/acquisition/reports" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+              Retry
+            </a>
           </div>
         ) : manifests.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No batches recorded yet. Run the Lead Engine to produce the first report.
+            <p>No batches recorded yet. Run the Lead Engine to produce the first report.</p>
+            <a href="/acquisition/generate" className="mt-3 inline-block rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+              Go to Lead Engine
+            </a>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border bg-card">
