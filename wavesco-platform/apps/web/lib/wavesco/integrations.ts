@@ -33,6 +33,42 @@ export interface IntegrationStatusView {
   lastOkAt: string | null;
 }
 
+export function maskUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//***`;
+  } catch {
+    return "***";
+  }
+}
+
+export function n8nHealth(): { status: "BLOCKED" | "ok"; reason?: string; url?: string } {
+  const raw = process.env.N8N_BASE_URL?.trim() ?? "";
+  if (!raw) return { status: "BLOCKED", reason: "N8N_BASE_URL missing" };
+  return { status: "ok", url: maskUrl(raw) };
+}
+
+export function getIntegrationsHealth(): Record<string, { status: string; reason?: string; url?: string; detail?: string }> {
+  const n8n = n8nHealth();
+  const dbUrl = process.env.DATABASE_URL?.trim() ?? "";
+  const db = dbUrl
+    ? { status: "ok", url: maskUrl(dbUrl), detail: "DATABASE_URL present" }
+    : { status: "BLOCKED", reason: "DATABASE_URL missing" };
+  const brevo = process.env.BREVO_API_KEY
+    ? { status: "ok", detail: "BREVO_API_KEY present" }
+    : { status: "BLOCKED", reason: "BREVO_API_KEY missing" };
+  const leadMode = process.env.LEAD_ENGINE_MODE ?? "local";
+  const leadRoot = process.env.LEAD_ENGINE_ROOT ?? "";
+  let lead_engine: { status: string; detail?: string; reason?: string } = { status: "ok", detail: `mode=${leadMode}` };
+  if (leadRoot) lead_engine.detail = `mode=${leadMode} root=${maskUrl(leadRoot)}`;
+  return {
+    lead_engine,
+    n8n: n8n.status === "BLOCKED" ? { status: "BLOCKED", reason: n8n.reason } : { status: "ok", url: n8n.url, detail: "N8N_BASE_URL configured" },
+    db,
+    brevo,
+  };
+}
+
 function engineEnvPath(): string | null {
   const candidates = [
     process.env.WAVESCO_ENV_PATH,
