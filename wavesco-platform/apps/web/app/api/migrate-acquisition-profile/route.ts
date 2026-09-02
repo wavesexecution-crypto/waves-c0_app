@@ -99,13 +99,50 @@ INSERT INTO "_prisma_migrations" (id, checksum, finished_at, migration_name, log
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+  function splitSql(s: string): string[] {
+    const out: string[] = [];
+    let cur = "";
+    let inDollar = false;
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      const next2 = s.slice(i, i + 2);
+      if (next2 === "$$") {
+        inDollar = !inDollar;
+        cur += "$$";
+        i += 1;
+        continue;
+      }
+      if (ch === ";" && !inDollar) {
+        if (cur.trim()) out.push(cur.trim());
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+  }
   try {
-    const statements = sql.split(";").map(s => s.trim()).filter(s => s.length > 0);
+    const statements = splitSql(sql);
+    let applied = 0;
+    const errors: string[] = [];
     for (const stmt of statements) {
-      await (direct as any).$executeRawUnsafe(stmt + ";");
+      try {
+        await (direct as any).$executeRawUnsafe(stmt + (stmt.endsWith(";") ? "" : ";"));
+        applied++;
+      } catch (e) {
+        const m = e instanceof Error ? e.message : String(e);
+        // Ignore already exists / duplicate errors for idempotency
+        if (m.includes("already exists") || m.includes("duplicate") || m.includes("42P07") || m.includes("42710")) {
+          applied++;
+          continue;
+        }
+        errors.push(m);
+      }
     }
     await direct.$disconnect();
-    return NextResponse.json({ ok: true, applied: statements.length });
+    if (errors.length) return NextResponse.json({ ok: false, applied, errors }, { status: 500 });
+    return NextResponse.json({ ok: true, applied });
   } catch (e) {
     try { await direct.$disconnect(); } catch {}
     const msg = e instanceof Error ? e.message : String(e);
