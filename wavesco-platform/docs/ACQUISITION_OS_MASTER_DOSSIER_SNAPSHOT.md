@@ -2,7 +2,7 @@
 
 > **Owner:** WavesCo · **Vault:** `WavesCo/Acquisition OS` · **Repo:** `D:\waves-c0_app\wavesco-platform`
 > **Created:** 2026-09-02 (Task 1 — Freeze, Inspect, and Seed)
-> **Status:** UPDATED 2026-09-02 — Acquisition Brief / Company Profile (Rented OS, no tiers) — 133 tests, 26 models, Company Profile live
+> **Status:** UPDATED 2026-09-02 — Waves Identity / Cross-Site SSO + Acquisition Brief — 148 tests, 27 models, shared .wavesco.in
 > **Freeze commit (platform):** `29ba04d` — `chore: redeploy with synced DB env for lead engine verification` (branch `main`, up to date with `origin/main` at freeze)
 > **Lead Engine:** `D:\wavesco-lead-engine` — not a git repo (standalone Python engine, dual-mode local SQLite / remote HTTP)
 
@@ -432,7 +432,7 @@ Live Vercel (`vercel env ls` 2026-09-02): `DATABASE_URL, DIRECT_URL, NEXTAUTH_UR
 
 - **RLS:** runtime role `wavesco_app` does NOT own tables, so row-level security (applied in migrations `20260825010000_wavesco_product_models`) is enforced. App never queries outside `withTenantContext(tenantId, tx => ...)` which `SET LOCAL app.tenant_id`.
 
-- **Count:** 26 models: `Tenant, User, RefreshToken, Module, TenantModule, AuditLog, IdempotencyKey, VerificationToken, GenerationBatch, Campaign, OutreachEmail, FollowUp, LeadResearch, OutreachOrder, LeadLifecycleEvent, ActivityEvent, Client, OnboardingStep, Project, ProjectTask, Deliverable, IntegrationStatus, ClientAiConfig, AiUsageLog, AcquisitionProfile, AcquisitionDataImport` (added 2026-09-02 — canonical Company Acquisition Profile, one per tenant `@@unique[tenantId]`, RLS `acquisitionprofile_isolation`).
+- **Count:** 27 models: `Tenant, User, RefreshToken, Module, TenantModule, AuditLog, IdempotencyKey, VerificationToken, GenerationBatch, Campaign, OutreachEmail, FollowUp, LeadResearch, OutreachOrder, LeadLifecycleEvent, ActivityEvent, Client, OnboardingStep, Project, ProjectTask, Deliverable, IntegrationStatus, ClientAiConfig, AiUsageLog, AcquisitionProfile, AcquisitionDataImport, WavesHandoffToken` (added 2026-09-02 — AcquisitionProfile + 2026-09-03 WavesHandoffToken `jti@unique` single-use handoff, RLS `waveshandofftoke_isolation`).
 
 - **Lead Engine local mirror:** SQLite `D:\wavesco-lead-engine\data\leads.db` (tables `leads, runs`) — never duplicated into Postgres; `lead-engine.ts` reads live (`DatabaseSync busy_timeout 3000`), writes only `updateLeadOutreachState`.
 
@@ -495,6 +495,31 @@ Live Vercel (`vercel env ls` 2026-09-02): `DATABASE_URL, DIRECT_URL, NEXTAUTH_UR
 **Security:** `credentialRef env:VAR` only, never raw keys in brief; `withTenantContext` + `@@unique[tenantId]` + `ENABLE ROW LEVEL SECURITY` + `GRANT wavesco_app`; every mutation `auditControl` before/after + `ActivityEvent`.
 
 **Agent context:** `company/objective/icp/offer/brand/existing_data/integrations/constraints/operating_preferences/current_state/historical_context/meta` — `maskUrl` + `redactSecrets`, `meta.model="nemotron-3-super"`.
+
+
+## 14b — Waves Identity / Cross-Site SSO (2026-09-02)
+
+**Canonical identity:** `Tenant` + `User` (email, passwordHash, tenantId, role) in Neon Postgres, owned by `prisma`. Auth via `NextAuth v5` (`@wavesco/auth` `authConfig` — Credentials + Nodemailer via Resend, JWT strategy `maxAge 30d`, `AUTH_SECRET` ≥32, `JWT_SECRET` for `jose HS256` access/refresh tokens). `User @@unique([tenantId,email])`, `RefreshToken`, `VerificationToken`. `Tenant.slug @unique`, `TenantModule` for entitlements, `WavesHandoffToken jti@unique` for single-use handoff.
+
+**Shared cookie domain (secure shared-domain strategy):** `NEXTAUTH_COOKIE_DOMAIN=.wavesco.in` in production → `__Secure-authjs.session-token` set with `Domain=.wavesco.in; Secure; HttpOnly; SameSite=Lax; Path=/` via `packages/auth/src/config.ts:72 cookies.sessionToken`. Both `https://wavesco.in` (main) and `https://app.wavesco.in` (app) read the same JWT (`getToken` with `secureCookie: protocol===https:` in `apps/web/middleware.ts:52`). No second user table, no duplicate account.
+
+**Main site is only login entry point:** `WAVES_MAIN_URL=https://wavesco.in` (`.env.example` + `turbo.json:globalEnv`). `apps/web/middleware.ts:68` — if `!isAuthenticated` and `PROTECTED_PREFIXES` and host `app.wavesco.in` (and not localhost), redirect to `new URL("/login", WAVES_MAIN_URL)` with `callbackUrl=https://app.wavesco.in/<originalPath>` (validated to `*.wavesco.in` to prevent open redirect). Local dev keeps local `/login` for testability.
+
+**Secure handoff (when cookie not present):** `POST /api/waves/handoff/create` (requires `requireControlAuth`, validates `destination` to `*.wavesco.in`, creates `WavesHandoffToken jti` + `SignJWT HS256 aud=app.wavesco.in exp=5m` via `lib/wavesco/handoff.ts:42 createHandoffToken`, stores hash, `auditControl waves.handoff.create` with `jtiHash`, returns `{token, jti, expiresAt}` in POST body — never in URL query). `POST /api/waves/handoff/consume` (no auth, takes `{token}` in JSON body, `jwtVerify` audience `app.wavesco.in`, checks `jti` exists, not `usedAt`, not `expired`, `tenantId/userId` match, `destination` match, destination allowed, marks `usedAt`, `audit` replay rejected, then `createAppSessionCookie` via `next-auth/jwt encode` with same `AUTH_SECRET` and `tenantId` claim, sets `__Secure-authjs.session-token` cookie for `.wavesco.in` (and `authjs.session-token` for http dev), returns `{destination}`).
+
+**Properties:** short-lived (5m), single-use (`usedAt` prevents replay), cryptographically protected (`HS256` with `AUTH_SECRET`), `aud` validated, `destination` validated to `*.wavesco.in`, no credentials/secrets in URL, no password passed, no raw session token in URL, `jti` hash only in audit.
+
+**App messaging (no second login):** `app/(auth)/login/page.tsx:11` — `Continue with your Waves profile` / `Your Waves account is used across Waves. No separate login is required.` / `One Waves account. All your products.` / `Login happens on the main Waves site. app.wavesco.in does not have an independent customer login.` Same for `/signup` — `Create your Waves account` / `Waves Account → Tenant → Products → Acquisition OS`.
+
+**App product visibility:** `lib/wavesco/entitlements.ts:14 getAcquisitionOSEntitlement(tenantId)` → `withTenantContext` → `Module.findUnique name=acquisition-os` → `TenantModule.findUnique tenantId_moduleId` → `active` if `status=enabled`, else `not_configured` (“Not rented — no entitlement record. Rent via Waves.”) or `inactive`. No fake `active`. `app/(dashboard)/products/page.tsx:1` — `WAVES Your Products` → `ACQUISITION OS Status: Active / Not currently active` + `[ Open Acquisition OS ]` if active else `[ Rent Acquisition OS ] → https://wavesco.in#products` + `Waves identity` footer. Sidebar adds `Waves → Your Products (/products, Package icon)` (`components/sidebar.tsx:39`).
+
+**Control Center remains:** `Waves Identity → Tenant → Entitlement → Acquisition OS → Control Center`. Existing `requireControlAuth → withTenantContext` boundaries unchanged (`middleware.ts` still checks `token.tenantId`, `lib/wavesco/control.ts:4` unchanged). `PROTECTED_PREFIXES` now includes `/products`.
+
+**Database:** Reuse `User, Tenant, VerificationToken, RefreshToken` (no duplicate). New `WavesHandoffToken` (`id, jti@unique, tenantId, userId, destination, expiresAt, usedAt, createdAt`, `@@index[tenantId]`, RLS `waveshandofftoke_isolation`, `GRANT wavesco_app`) — `schema.prisma:556` + `migrations/20260903000000_waves_handoff/migration.sql` (9 statements, applied `{"ok":true,"applied":9}` via `POST /api/migrate-handoff` with `DIRECT_URL` owner).
+
+**Security verified:** `authConfig.callbacks.redirect` validates `//evil.com` → `baseUrl` (open redirect blocked, `tests/waves-identity.test.ts:7`), `middleware` validates `callbackUrl` to `*.wavesco.in`, `handoff` validates `aud`, `exp`, `jti`, `destination`, `usedAt`, `tenantId` match, `withTenantContext` prevents cross-tenant (`tenant-a` cannot read `tenant-b`), `logout` clears `authjs.session-token`/`__Secure-…`, no secrets in URL/body audit only `jtiHash`, same `User` table for both sites (no duplicate `duplicate@test.com` → `userCount 1`).
+
+**Future billing contract:** `lib/wavesco/entitlements.ts:30 BillingContract { product: "acquisition-os", checkout(tenantId): {url}, verify(tenantId,sessionId): Entitlement, entitlement(tenantId): Entitlement }` — `Choose → Rent → Pay → verified subscription → TenantModule enabled → isActive` — not implemented in this task.
 
 ## 15 — Authentication
 
@@ -994,8 +1019,8 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 |-----------|--------|--------|---------------|
 | Control Center (app.wavesco.in) | READY | 10 dashboard pages + 10 control APIs + System health/logs/errors/jobs/queues/db/config/audit — all `force-dynamic`, `requireControlAuth`, AuditLog per action, SWR 15–30s, ConfirmDialog | 2026-09-02 (HEAD 5255c56, 103 tests) |
 | Lead Engine dual-mode | READY (local) / SET (remote) | Local: `D:\wavesco-lead-engine\data\leads.db` True, `engine/` 10 tools verified; Remote: `LEAD_ENGINE_MODE=remote` + `LEAD_ENGINE_API_URL Hidden SET` (vercel 6d ago) | 2026-09-02 |
-| DB (Neon + RLS) | READY | `schema.prisma` 26 models (+AcquisitionProfile, AcquisitionDataImport), `wavesco_app` RLS (`acquisitionprofile_isolation`), `withTenantContext SET LOCAL app.tenant_id`, `DATABASE_URL/DIRECT_URL` both SET | 2026-09-02 |
-| Module contract | READY | `acquisition-os@1.0.0` 7 tables declared + canonical `AcquisitionProfile`/`AcquisitionDataImport` (Platform 26 total) + 17 actions, audit true, requiresEnv LEAD_ENGINE_ROOT,N8N_BASE_URL; `automation-os` + `client-os` hidden from nav (Acquisition OS only) | 2026-09-02 |
+| DB (Neon + RLS) | READY | `schema.prisma` 27 models (+AcquisitionProfile, AcquisitionDataImport, WavesHandoffToken), `wavesco_app` RLS (`acquisitionprofile_isolation`, `waveshandofftoke_isolation`), `withTenantContext`, `DATABASE_URL/DIRECT_URL` SET | 2026-09-02 |
+| Module contract | READY | `acquisition-os@1.0.0` 7 tables + `AcquisitionProfile/Import` (Platform 27) + 17 actions; `WavesHandoffToken` for SSO; `TenantModule` as entitlement | 2026-09-02 |
 | n8n | BLOCKED (prod) | `N8N_BASE_URL` missing in vercel prod → health `BLOCKED: N8N_BASE_URL missing`; fallback manifest `D:\n8n-personal-automations\workflows-manifest.json` | 2026-09-02 |
 | Brevo/SMTP | BLOCKED (prod) | `BREVO_API_KEY` missing → `BLOCKED: BREVO_API_KEY missing`; SMTP `Personal - SMTP` placeholder in n8n | 2026-09-02 |
 | AI Gateway | READY | `ClientAiConfig.credentialRef env:OPENAI_API_KEY`, Ollama Cloud `https://ollama.com/v1` gemma4:31b, `vercel env SET OPENAI_*`; `AiUsageLog` ledger | 2026-09-02 |
@@ -1014,6 +1039,7 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 | `/acquisition/integrations` | READY | matrix with health + Test Connection masked; BLOCKED pills | 2026-09-02 |
 | `/acquisition/reports` (Documents) | READY | generation+download+lineage | 2026-09-02 |
 | `/acquisition/email` + `/outreach` | READY | email templates + delivery states + queue | 2026-09-02 |
+| `/products` | READY | Waves Your Products — `getAcquisitionOSEntitlement` → Active / Not currently active (not_configured, not fake) → [Open]/[Rent] | 2026-09-02 |
 | `/acquisition/profile` | READY | Company→Objective→ICP→Data→Offer→Brand→Integrations→Rules → Brief → readiness checklist → Activate/Pause/Resume/Suspend → Nemotron context masked | 2026-09-02 |
 | `/acquisition/analytics` | READY | funnel + costs; empty tenant → zeros | 2026-09-02 |
 | `/system` | READY | health/logs/errors/jobs/queues/db/config/audit 7 sections | 2026-09-02 |
@@ -1040,6 +1066,8 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 | 14 | Dossier Complete + Docs + E2E + Deploy | DONE | `HEAD 5255c56` — 103 tests, 44/44 filled |
 | 15 | Acquisition Brief / Company Profile | DONE | `28009bf` — 133 tests, 26 models, rented OS no tiers, Nemotron context, readiness, lifecycle |
 | 16 | Migrate + Cleanup | DONE | `7363bd5` — manual DDL via DIRECT_URL, 15 statements, migrate route removed |
+| 17 | Waves Identity / SSO | DONE | `559b45b` — shared .wavesco.in cookie, handoff 5m single-use, 148 tests |
+| 18 | Identity fix + migrate handoff | DONE | `8a0a8db` — redirect guard + WavesHandoffToken 9 stmts, 15/15 identity tests |
 
 ### Integration Status
 
@@ -1077,9 +1105,10 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 | `email-verify.test.ts` | PASS | 2026-09-02 06:34 | 5 tests |
 | `integrations.test.ts` | PASS | 2026-09-02 06:34 | 2 tests |
 | `acquisition-profile.test.ts` | PASS | 2026-09-02 10:40 | 21 tests — create/update/isolation/readiness/activate/import/audit/context/redact |
+| `waves-identity.test.ts` | PASS | 2026-09-02 11:18 | 15 tests — wavesco.in canonical, shared cookie, handoff invalid/expired/replayed, cross-tenant, no duplicate |
 | `e2e/acquisition-profile-flow.test.ts` | PASS | 2026-09-02 10:40 | 9 tests — Company→Brief→Readiness→Activate→Context→Import→Pause→Audit→isolation |
 | `e2e/acquisition-flow.test.ts` | PASS | 2026-09-02 06:34 | 3 tests — discover→audit or BLOCKED |
-| **Total** | **19 suites PASS** | 2026-09-02 10:40 | **133 tests passed 0 failed** (`pnpm --filter web test`) |
+| **Total** | **20 suites PASS** | 2026-09-02 11:18 | **148 tests passed 0 failed** (`pnpm --filter web test`) |
 
 ### Deployment Status
 
@@ -1092,4 +1121,4 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 
 ---
 
-*Dossier updated 2026-09-02 — Acquisition Brief / Company Profile (Choose. Rent. Operate., Nemotron 3 Super, readiness, lifecycle) — 133 tests. Prior: completed 2026-09-02 by Task 14 agent. Evidence: `git status/diff/log --oneline -10`, `modules/acquisition-os+automation-os+client-os/module.contract.json`, `packages/db/prisma/schema.prisma:1-492`, `apps/web/lib/wavesco/*`, `apps/web/app/(dashboard)/*`, `apps/web/app/api/acquisition/*|system/*`, `wavesco-lead-engine/config.json + engine/ ls`, `vercel ls/inspect/env ls`, `pnpm --filter web test` (103 tests). No secrets stored. BLOCKED/NOT TESTED states faithfully marked; no fake PASS.*
+*Dossier updated 2026-09-02 — Waves Identity / Cross-Site SSO + Acquisition Brief — 148 tests, 27 models. Prior: 133 tests Acquisition Brief.* Evidence: `git status/diff/log --oneline -10`, `modules/acquisition-os+automation-os+client-os/module.contract.json`, `packages/db/prisma/schema.prisma:1-492`, `apps/web/lib/wavesco/*`, `apps/web/app/(dashboard)/*`, `apps/web/app/api/acquisition/*|system/*`, `wavesco-lead-engine/config.json + engine/ ls`, `vercel ls/inspect/env ls`, `pnpm --filter web test` (103 tests). No secrets stored. BLOCKED/NOT TESTED states faithfully marked; no fake PASS.*
