@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wavesco/ui";
 import { LoginForm } from "./login-form";
@@ -46,12 +45,6 @@ export default async function LoginPage() {
         <Suspense>
           <LoginForm />
         </Suspense>
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link href="https://wavesco.in/signup" className="font-medium text-primary hover:underline">
-            Create one on Waves
-          </Link>
-        </p>
       </CardContent>
     </Card>
   );
