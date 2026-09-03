@@ -33,12 +33,27 @@ export function LoginForm() {
     }
 
     const callbackUrl = searchParams.get("callbackUrl");
-    // Only allow same-origin relative paths — reject protocol-relative
-    // (`//host`) and absolute URLs to prevent open redirects.
-    const safeCallbackUrl =
-      callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : null;
-    router.push(safeCallbackUrl ?? "/overview");
-    router.refresh();
+    let safe: string | null = null;
+    if (callbackUrl) {
+      if (callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
+        safe = callbackUrl;
+      } else {
+        try {
+          const dest = new URL(callbackUrl);
+          const allowed = ["wavesco.in", "app.wavesco.in", "www.wavesco.in", "localhost", "127.0.0.1"];
+          if (allowed.some((h) => dest.hostname === h || dest.hostname.endsWith("." + h))) {
+            safe = callbackUrl;
+          }
+        } catch {}
+      }
+    }
+    const dest = safe ?? "/overview";
+    if (dest.startsWith("http")) {
+      window.location.href = dest;
+    } else {
+      router.push(dest);
+      router.refresh();
+    }
   }
 
   return (
