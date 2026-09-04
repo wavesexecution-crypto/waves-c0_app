@@ -44,9 +44,9 @@ export async function GET() {
         void e;
       }
       try {
-        lastRun = (await getLastEngineRun()) ?? null;
+        lastRun = (await getLastEngineRun()) ?? undefined;
       } catch {
-        lastRun = null;
+        lastRun = undefined;
       }
       leadEngine = { status: "ok", detail: facets.categories.length > 0 || facets.cities.length > 0 ? "corpus reachable" : "Lead Engine reachable" };
     } catch (e) {
@@ -56,7 +56,7 @@ export async function GET() {
       };
       // corpus stays zeroed, facets empty, lastRun null
       facets = { categories: [], cities: [] };
-      lastRun = null;
+      lastRun = undefined;
     }
 
     // --- Platform counts + recent activity (tenant-scoped) ---

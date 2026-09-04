@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auditControl, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
+import { onCampaignResultsFinalized } from "@/lib/wavesco/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         before,
         after: { status: nextStatus },
       });
+
+      // Real transition: a campaign concluded (running/paused/scheduled -> stopped)
+      // means its results are now final.
+      if (nextStatus === "stopped") {
+        onCampaignResultsFinalized(
+          tenantId,
+          campaign.id,
+          undefined,
+          {},
+          userId ?? undefined,
+          `campaign-stop-${campaign.id}`,
+        );
+      }
 
       return { ok: true, status: nextStatus, campaignId: campaign.id, before };
     });

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
-import { getLeadStats } from "@/lib/wavesco/lead-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +15,7 @@ async function safeCount(tx: any, model: string, where: any): Promise<number> {
   }
 }
 
-export async function GET() {
+export async function GET(_request?: Request) {
   // auth
   let tenantId: string;
   try {
@@ -36,7 +35,9 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  // acquisition via lead engine with fallback
+  // acquisition — computed TENANT-SCOPED from LeadResearch / OutreachOrder
+  // inside withTenantContext below. The shared Lead Engine corpus is
+  // cross-tenant and must NEVER be presented as a tenant's acquisition data.
   let acquisition: {
     total: number;
     emailReady: number;
@@ -56,22 +57,6 @@ export async function GET() {
     byTier: {},
     lastResearchedAt: null,
   };
-
-  try {
-    const stats = await getLeadStats();
-    acquisition = {
-      total: stats.total ?? 0,
-      emailReady: stats.emailReady ?? 0,
-      contacted: stats.contacted ?? 0,
-      replies: (stats as any).replies ?? 0,
-      optedOut: (stats as any).optedOut ?? 0,
-      bounced: (stats as any).bounced ?? 0,
-      byTier: (stats as any).byTier ?? {},
-      lastResearchedAt: (stats as any).lastResearchedAt ?? null,
-    };
-  } catch {
-    // keep zeros — engine unreachable returns zeros not error
-  }
 
   // tenant-scoped aggregates
   let campaign: {
@@ -295,6 +280,49 @@ export async function GET() {
       const generationTotal = await safeCount(tx, "generationBatch", { tenantId });
       const followUpsPending = await safeCount(tx, "followUp", { tenantId, status: "pending" });
 
+      // acquisition — TENANT-SCOPED only. Sourced from this tenant's
+      // LeadResearch snapshots and OutreachOrder rows; never the shared corpus.
+      const acqTotal = await safeCount(tx, "leadResearch", { tenantId });
+      const acqEmailReady = await safeCount(tx, "leadResearch", {
+        tenantId,
+        email: { not: null },
+      });
+      const acqContacted = await safeCount(tx, "outreachOrder", { tenantId });
+      const acqOptedOut = await safeCount(tx, "outreachOrder", {
+        tenantId,
+        replyStatus: "unsubscribed",
+      });
+      const acqBounced = await safeCount(tx, "outreachOrder", {
+        tenantId,
+        deliveryStatus: "bounced",
+      });
+      const byTier: Record<string, number> = {};
+      try {
+        const tiers = await tx.leadResearch.groupBy({
+          by: ["tier"],
+          where: { tenantId },
+          _count: { _all: true },
+        });
+        for (const t of tiers as any[]) {
+          byTier[String(t.tier ?? "unclassified")] = t._count?._all ?? 0;
+        }
+      } catch {
+        // keep empty — never fabricate tier distribution
+      }
+      let lastResearchedAt: string | null = null;
+      try {
+        const last = await tx.leadResearch.findFirst({
+          where: { tenantId },
+          orderBy: { researchedAt: "desc" },
+          select: { researchedAt: true },
+        });
+        lastResearchedAt = last?.researchedAt
+          ? new Date(last.researchedAt).toISOString()
+          : null;
+      } catch {
+        // keep null
+      }
+
       return {
         campaignTotal,
         outreachSent,
@@ -312,8 +340,21 @@ export async function GET() {
         usageLogs,
         generationTotal,
         followUpsPending,
+        acquisitionTenant: {
+          total: acqTotal,
+          emailReady: acqEmailReady,
+          contacted: acqContacted,
+          replies: orderReplied,
+          optedOut: acqOptedOut,
+          bounced: acqBounced,
+          byTier,
+          lastResearchedAt,
+        },
       };
     });
+
+    // tenant-scoped acquisition data (already computed inside the tenant tx)
+    acquisition = dbData.acquisitionTenant;
 
     // build campaign
     const eligible = acquisition.emailReady; // eligible pool is emailReady from corpus

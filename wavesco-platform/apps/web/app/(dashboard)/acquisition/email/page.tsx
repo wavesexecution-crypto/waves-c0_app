@@ -9,6 +9,8 @@ import { TestConnectionButton } from "@/components/acquisition/integrations-cont
 import { EmailTemplateControls } from "@/components/acquisition/email-template-controls";
 import { brevoHealth, getIntegrationsHealth } from "@/lib/wavesco/integrations";
 import { formatIST } from "@/lib/wavesco/time";
+import { readEmailMode } from "@/lib/wavesco/mail-mode";
+import { EmailModeSelector } from "@/components/acquisition/email-mode-selector";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Email Control" };
@@ -40,6 +42,21 @@ export default async function EmailControlPage() {
     health = null;
   }
   const brevoEntry = health?.brevo ?? null;
+
+  // Email operating mode (client choice; both modes share one lifecycle).
+  // Defaults to waves_managed on transient failure — never blocks the page.
+  let emailMode: "waves_managed" | "client_managed" = "waves_managed";
+  try {
+    emailMode = await withTenantContext(tenantId, async (tx: any) => {
+      const profile = await tx.acquisitionProfile.findFirst({
+        where: { tenantId },
+        select: { integrations: true },
+      });
+      return readEmailMode(profile?.integrations);
+    });
+  } catch {
+    // keep default
+  }
 
   // Templates
   let templates: { id: string; subject: string; body: string; createdAt?: string }[] = [];
@@ -167,6 +184,9 @@ export default async function EmailControlPage() {
           <span className="text-xs uppercase tracking-widest text-muted-foreground">Brevo {brevoStatus}</span>
         </div>
       </div>
+
+      {/* Email operating mode — client choice, one shared lifecycle */}
+      <EmailModeSelector initialMode={emailMode} />
 
       {/* Sending Integration — Brevo */}
       <section className="rounded-lg border bg-card p-4">

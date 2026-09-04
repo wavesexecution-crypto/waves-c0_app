@@ -6,3 +6,4 @@ export * from "./idempotency";
 export * from "./audit";
 export * from "./auth-lookup";
 export * from "./tenant-lookup";
+export * from "./notifications";

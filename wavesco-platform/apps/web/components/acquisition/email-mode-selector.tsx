@@ -1,0 +1,165 @@
+"use client";
+
+/**
+ * Email operating mode selector — the client-facing choice:
+ *
+ *   [ Use our email system ]  → client_managed: recorded as a preference with
+ *     status `setup_pending` (a Waves specialist connects the client mailbox
+ *     with the client — concierge setup). Never shown as active until real
+ *     credentials exist.
+ *   [ Have Waves handle it ]  → waves_managed: active immediately; Waves
+ *     operates the outbound infrastructure.
+ *
+ * Both modes feed the SAME campaign lifecycle. The choice is persisted on the
+ * tenant profile via POST /api/acquisition/email/mode (session-authenticated,
+ * tenant-scoped, audit-logged). No internal infrastructure terms are shown.
+ */
+
+import { useState } from "react";
+import { StatusPill } from "@/components/command/primitives";
+
+type EmailMode = "waves_managed" | "client_managed";
+
+interface ModeState {
+  mode: EmailMode;
+  label: string;
+  status: string;
+  description: string;
+}
+
+function modeState(mode: EmailMode): ModeState {
+  return mode === "waves_managed"
+    ? {
+        mode,
+        label: "Waves handles email",
+        status: "active",
+        description:
+          "Waves manages the email infrastructure for your acquisition campaigns. Nothing for you to configure.",
+      }
+    : {
+        mode,
+        label: "Use our email system",
+        status: "setup_pending",
+        description:
+          "We've recorded that you want your own mailbox used. A Waves specialist will connect it with you — until then your campaigns keep sending through Waves-managed email.",
+      };
+}
+
+const CARDS: { mode: EmailMode; title: string; subtitle: string }[] = [
+  {
+    mode: "client_managed",
+    title: "Use our email system",
+    subtitle: "Connect your company's existing mailbox. A Waves specialist will set it up with you.",
+  },
+  {
+    mode: "waves_managed",
+    title: "Have Waves handle it",
+    subtitle: "Waves manages the email infrastructure for your campaigns. Nothing for you to configure.",
+  },
+];
+
+export function EmailModeSelector({ initialMode }: { initialMode: EmailMode }) {
+  const [current, setCurrent] = useState<ModeState>(() => modeState(initialMode));
+  const [saving, setSaving] = useState<EmailMode | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function choose(mode: EmailMode) {
+    if (mode === current.mode || saving) return;
+    setSaving(mode);
+    setError(null);
+    try {
+      const res = await fetch("/api/acquisition/email/mode", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(
+          data?.detail ??
+            data?.error ??
+            "Could not save your preference. Please try again.",
+        );
+        return;
+      }
+      setCurrent({
+        mode: data.mode,
+        label: data.label,
+        status: data.status,
+        description: data.description,
+      });
+    } catch {
+      setError("Could not save your preference. Check your connection and try again.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border bg-card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">How should Acquisition OS handle email?</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Your choice decides how campaign emails are sent. Either way, sending only
+            happens after you approve a campaign.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusPill
+            state={current.status === "active" ? "connected" : "pending"}
+          />
+          <span className="text-xs font-medium">{current.label}</span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {CARDS.map((c) => {
+          const selected = c.mode === current.mode;
+          return (
+            <button
+              key={c.mode}
+              type="button"
+              onClick={() => void choose(c.mode)}
+              disabled={saving !== null}
+              aria-pressed={selected}
+              className={`rounded-md border p-3 text-left transition-colors disabled:opacity-60 ${
+                selected
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:bg-accent/40"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">{c.title}</span>
+                {selected ? (
+                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    Selected
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{c.subtitle}</p>
+              {saving === c.mode ? (
+                <p className="mt-2 text-[11px] text-muted-foreground">Saving…</p>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mt-3 text-xs text-muted-foreground">{current.description}</p>
+
+      {error ? (
+        <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/5 p-2">
+          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+          <button
+            type="button"
+            className="mt-1 text-[11px] underline underline-offset-2"
+            onClick={() => setError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}

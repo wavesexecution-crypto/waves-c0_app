@@ -8,6 +8,8 @@ import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { recordActivity } from "@/lib/wavesco/activity";
 import { auditControl } from "@/lib/wavesco/control";
+import { onCycleReportReady } from "@/lib/wavesco/notify";
+import { runAcquisitionReconciliation } from "@/lib/wavesco/reconcile";
 import {
   cancelOrder,
   checkLeadEmail,
@@ -197,6 +199,8 @@ async function finishBatch(
     metadata: { ...counts },
     sourceKey: `pipeline-batch:${label}:${new Date().toISOString().slice(0, 16)}`,
   });
+  // Real transition: the cycle-level batch summary/report is finalized.
+  onCycleReportReady(tenantId, undefined, {}, undefined, `batch-summary:${label}`);
   return { ...counts, telegram: telegram.ok ? telegram.delivered ?? "accepted" : `failed: ${telegram.error}`, obsidian };
 }
 
@@ -368,4 +372,37 @@ function revalidatePipeline(): void {
   revalidatePath("/acquisition/pipeline");
   revalidatePath("/acquisition");
   revalidatePath("/command");
+}
+
+// ------------------------------------------------------------------
+// REAL lifecycle reconciliation (reply sync, follow-up evaluation,
+// stuck-send healing). Server-invoked; never frontend polling.
+// ------------------------------------------------------------------
+
+export async function reconcileNowAction(
+  _prev: PipelineActionState,
+  _formData: FormData,
+): Promise<PipelineActionState> {
+  const user = await requireUser();
+  if (!can({ role: user.role }, "update", "acquisition")) {
+    return { ok: false, error: "Admin role required." };
+  }
+  const r = await runAcquisitionReconciliation(user.tenantId);
+  if (!r.ok) {
+    return {
+      ok: false,
+      error: `Sync finished with errors: ${r.errors.join("; ").slice(0, 400)}`,
+    };
+  }
+  const parts = [
+    `${r.repliesUpdated} reply update(s)`,
+    `${r.followUpsReady} follow-up(s) ready`,
+    `${r.followUpsWindowCompleted} window(s) completed`,
+    `${r.sendsReconciled} send(s) confirmed`,
+  ];
+  if (r.sendsStillPending > 0) {
+    parts.push(`${r.sendsStillPending} send(s) still awaiting provider confirmation`);
+  }
+  revalidatePath("/acquisition/pipeline");
+  return { ok: true, message: `Sync complete: ${parts.join(", ")}.` };
 }

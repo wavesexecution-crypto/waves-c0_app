@@ -5,6 +5,8 @@ import { getIntegrationsHealth } from "@/lib/wavesco/integrations";
 import { StatusPill } from "@/components/command/primitives";
 import { AutoRefresh } from "@/components/command/auto-refresh";
 import { TestConnectionButton } from "@/components/acquisition/integrations-controls";
+import { StorageConnectorCard } from "@/components/acquisition/storage-connector-card";
+import { readPersistedStorageConfig, sanitizeStorageConfigForClient } from "@/lib/wavesco/storage";
 import { withTenantContext } from "@wavesco/db";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +57,15 @@ export default async function IntegrationsPage() {
     } catch {
       // ignore
     }
+  }
+
+  let storageInitial: Record<string, unknown> | null = null;
+  try {
+    storageInitial = await withTenantContext(tenantId, async (tx: any) =>
+      sanitizeStorageConfigForClient(await readPersistedStorageConfig(tx, tenantId)),
+    );
+  } catch {
+    // transient DB error — the card will show NOT CONNECTED and retry on connect
   }
 
   const integrations = health
@@ -113,6 +124,8 @@ export default async function IntegrationsPage() {
           </p>
         </div>
       ) : null}
+
+      <StorageConnectorCard initial={storageInitial} />
 
       {/* Health matrix */}
       <div className="overflow-x-auto rounded-lg border bg-card">

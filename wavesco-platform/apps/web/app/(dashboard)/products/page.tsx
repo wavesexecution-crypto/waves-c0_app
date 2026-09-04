@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Your Products" };
 
 function Pill({ status }: { status: string }) {
   const s = status === "active" ? "live" : status === "inactive" ? "error" : "disconnected";
-  return <StatusPill state={s as any} label={status} />;
+  return <StatusPill state={s as any} />;
 }
 
 export default async function ProductsPage() {

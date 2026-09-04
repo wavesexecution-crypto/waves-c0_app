@@ -5,6 +5,7 @@ import { withTenantContext } from "@wavesco/db";
 import { Button } from "@wavesco/ui";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
+import { MilestoneNotificationCenterServer } from "@/components/milestone-notification-center-server";
 import { hasInternalAccess, requireTenantId } from "@/lib/tenant";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -49,7 +50,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar tenantName={data.tenantName} email={email} initials={initials} auditEntries={data.auditEntries} />
+        <Topbar tenantName={data.tenantName} email={email} initials={initials} auditEntries={data.auditEntries} milestoneNotifications={<MilestoneNotificationCenterServer />} />
         <main className="flex-1 p-6">{children}</main>
         <div className="flex h-14 items-center justify-end border-t px-6">
           <form action={signOutAction}>

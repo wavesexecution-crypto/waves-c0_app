@@ -571,7 +571,7 @@ export default async function AnalyticsPage() {
       <section className="space-y-3">
         <SectionHeader title="API usage" subtitle="ActivityEvent total + generation batches + follow-ups" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Total Events" value={formatInt(apiUsage.totalEvents)} detail={`${apiUsage.recentEvents ?? workflow.recentEvents} recent`} />
+          <MetricCard label="Total Events" value={formatInt(apiUsage.totalEvents)} detail={`${workflow.recentEvents} recent`} />
           <MetricCard label="Integration Checks" value={formatInt(apiUsage.integrationChecks)} />
           <MetricCard label="Generation Batches" value={formatInt(apiUsage.generationBatches)} href="/acquisition/reports" />
           <MetricCard label="Follow-ups Pending" value={formatInt(apiUsage.followUpsPending)} href="/acquisition/follow-ups" />
@@ -674,13 +674,12 @@ export default async function AnalyticsPage() {
               <span className="w-24 text-right text-xs tabular-nums">{formatUsd(costs.leadCostUsd)}</span>
             </div>
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">Estimates: token $0.00002/token (~$20/1M), lead $0.005/lead placeholder. Replace with config pricing when available; zeros if empty tenant.</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">Cost figures are estimates based on Waves' current usage rates and may vary slightly. Periods without AI activity show no cost.</p>
         </div>
       </section>
 
       <p className="text-[11px] text-muted-foreground">
-        Analytics via tenant-scoped withTenantContext + getLeadStats fallback. Route: GET /api/acquisition/analytics returns acquisition, campaign, funnel, responseRates, workflow, apiUsage, modelUsage, costs — zeros if empty, not error.
-      </p>
+                All metrics reflect your workspace's actual activity. Metrics show zero until your first campaigns run.</p>
     </div>
   );
 }

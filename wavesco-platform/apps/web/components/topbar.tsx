@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { Avatar, AvatarFallback } from "@wavesco/ui";
 import { Button } from "@wavesco/ui";
 import {
@@ -22,9 +24,10 @@ export interface TopbarProps {
   initials: string;
   auditEntries: AuditEntry[];
   name?: string;
+  milestoneNotifications?: ReactNode;
 }
 
-export function Topbar({ tenantName, email, initials, auditEntries, name }: TopbarProps) {
+export function Topbar({ tenantName, email, initials, auditEntries, name, milestoneNotifications }: TopbarProps) {
   const displayName = name || email.split("@")[0] || "Waves User";
 
   return (
@@ -34,6 +37,7 @@ export function Topbar({ tenantName, email, initials, auditEntries, name }: Topb
         <p className="truncate text-xs text-muted-foreground">One Waves account across all platforms.</p>
       </div>
       <div className="flex items-center gap-2">
+        {milestoneNotifications}
         <NotificationBell entries={auditEntries} />
         <ThemeToggle />
         <DropdownMenu>

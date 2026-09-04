@@ -142,7 +142,21 @@ describe("GET /api/acquisition/analytics", () => {
           },
           findMany: async () => [],
         },
-        leadResearch: { count: async () => 100 },
+        leadResearch: {
+          count: async (args: any) => {
+            const where = args?.where ?? {};
+            // emailReady = leads with a verified email snapshot
+            if (where.email && where.email.not === null) return 40;
+            return 100;
+          },
+          groupBy: async () => [
+            { tier: "A", _count: { _all: 10 } },
+            { tier: "B", _count: { _all: 20 } },
+          ],
+          findFirst: async () => ({
+            researchedAt: new Date("2026-09-01T00:00:00.000Z"),
+          }),
+        },
         activityEvent: {
           count: async () => 25,
           findMany: async () => [
@@ -186,5 +200,58 @@ describe("GET /api/acquisition/analytics", () => {
     expect(json.modelUsage.byModel.length).toBeGreaterThan(0);
     expect(json.costs.estimatedCostUsd).toBeGreaterThan(0);
     expect(json.apiUsage.totalEvents).toBe(25);
+  });
+
+  it("never reads the cross-tenant lead engine corpus (tenant isolation)", async () => {
+    const { requireControlAuth } = await import("@/lib/wavesco/control");
+    const { withTenantContext } = await import("@wavesco/db");
+    const { getLeadStats } = await import("@/lib/wavesco/lead-engine");
+
+    vi.mocked(requireControlAuth).mockResolvedValue({ tenantId: "t1", userId: "u1", session: {} } as any);
+    vi.mocked(getLeadStats).mockResolvedValue({
+      // Corpus-wide numbers that must NEVER surface as tenant metrics.
+      total: 9999,
+      emailReady: 9999,
+      contacted: 9999,
+      replies: 9999,
+      optedOut: 0,
+      bounced: 0,
+      byTier: { A: 9999 },
+      lastResearchedAt: "2026-09-01T00:00:00.000Z",
+    } as any);
+
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId: string, fn: any) => {
+      const tx: any = new Proxy(
+        {
+          activityEvent: { count: async () => 0, findMany: async () => [] },
+          integrationStatus: { count: async () => 0, findMany: async () => [] },
+          aiUsageLog: { findMany: async () => [] },
+        },
+        {
+          get(target: any, prop: string) {
+            if (prop in target) return target[prop];
+            // Default: count() always 0 — tenant DB is empty.
+            return {
+              count: async () => 0,
+              findMany: async () => [],
+              findFirst: async () => null,
+            };
+          },
+        },
+      );
+      return fn(tx);
+    });
+
+    const { GET } = await import("@/app/api/acquisition/analytics/route");
+    const res = await (GET as any)(new Request("http://test"));
+    expect(res.status).toBe(200);
+    const json: any = await res.json();
+    // Corpus says 9999 everywhere; tenant DB is empty — analytics must show 0.
+    expect(json.acquisition.total).toBe(0);
+    expect(json.acquisition.emailReady).toBe(0);
+    expect(json.acquisition.replies).toBe(0);
+    expect(Object.values(json.acquisition.byTier ?? {}).reduce((a: number, b: any) => a + b, 0)).toBe(0);
+    // The shared corpus reader must not be invoked at all.
+    expect(getLeadStats).not.toHaveBeenCalled();
   });
 });

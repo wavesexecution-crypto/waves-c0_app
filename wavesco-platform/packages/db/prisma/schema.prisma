@@ -4,9 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  directUrl  = env("DIRECT_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ------------------------------------------------------------------
@@ -28,10 +28,12 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users         User[]
-  modules       TenantModule[]
-  idempotency   IdempotencyKey[]
-  refreshTokens RefreshToken[]
+  users                   User[]
+  modules                 TenantModule[]
+  idempotency             IdempotencyKey[]
+  refreshTokens           RefreshToken[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 }
 
 model User {
@@ -81,17 +83,17 @@ model Module {
 }
 
 model TenantModule {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   moduleId   String
-  module     Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  status     String   @default("enabled")
+  module     Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  status     String    @default("enabled")
   config     Json?
   enabledAt  DateTime?
   disabledAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@unique([tenantId, moduleId])
 }
@@ -168,19 +170,19 @@ model GenerationBatch {
 }
 
 model Campaign {
-  id                String    @id @default(cuid())
-  tenantId          String
-  name              String
-  location          String?
-  category          String?
-  tier              String?
-  status            String    @default("draft")
-  sendingLimit      Int?
-  scheduledFor      DateTime?
-  eligibleSnapshot  Json?
-  createdByUserId   String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  tenantId         String
+  name             String
+  location         String?
+  category         String?
+  tier             String?
+  status           String    @default("draft")
+  sendingLimit     Int?
+  scheduledFor     DateTime?
+  eligibleSnapshot Json?
+  createdByUserId  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([tenantId, status])
 }
@@ -210,21 +212,21 @@ model OutreachEmail {
 }
 
 model FollowUp {
-  id              String    @id @default(cuid())
+  id              String         @id @default(cuid())
   tenantId        String
   leadKey         String?
   business        String
   dueAt           DateTime
-  status          String    @default("pending")
+  status          String         @default("pending")
   note            String?
-  channel         String    @default("email")
+  channel         String         @default("email")
   campaignId      String?
   outreachEmailId String?
   outreachOrderId String?
-  followUpNumber  Int       @default(1) @map("follow_up_number")
+  followUpNumber  Int            @default(1) @map("follow_up_number")
   completedAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   outreachOrder   OutreachOrder? @relation(fields: [outreachOrderId], references: [id])
 
   @@index([tenantId, status, dueAt])
@@ -234,35 +236,35 @@ model FollowUp {
 // Research snapshot per lead, traceable to the engine corpus. One row per
 // (tenant, leadKey): refreshed in place, never duplicated.
 model LeadResearch {
-  id             String   @id @default(cuid())
-  tenantId       String
-  leadKey        String
-  engineLeadId   Int?
-  business       String
-  category       String?
-  area           String?
-  city           String?
-  website        String?
-  instagram      String?
-  rating         Float?
-  reviews        Int?
-  tier           String?
-  leadScore      Int?
+  id              String    @id @default(cuid())
+  tenantId        String
+  leadKey         String
+  engineLeadId    Int?
+  business        String
+  category        String?
+  area            String?
+  city            String?
+  website         String?
+  instagram       String?
+  rating          Float?
+  reviews         Int?
+  tier            String?
+  leadScore       Int?
   digitalPresence String?
-  problem        String?
-  opportunity    String?
-  serviceFit     String?
-  angleSeed      String?
-  contactName    String?
-  contactRole    String?
-  email          String?
-  sourceUrls     Json?
-  verification   String?
-  notes          String?
-  researchedAt   DateTime @default(now())
-  checkedAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  problem         String?
+  opportunity     String?
+  serviceFit      String?
+  angleSeed       String?
+  contactName     String?
+  contactRole     String?
+  email           String?
+  sourceUrls      Json?
+  verification    String?
+  notes           String?
+  researchedAt    DateTime  @default(now())
+  checkedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@unique([tenantId, leadKey])
   @@index([tenantId, researchedAt])
@@ -272,45 +274,45 @@ model LeadResearch {
 // READY_FOR_APPROVAL → PENDING → APPROVED → SENT → DELIVERED/FAILED,
 // with REJECTED / CANCELLED terminal states.
 model OutreachOrder {
-  id               String    @id @default(cuid())
-  tenantId         String
-  version          Int       @default(1)
-  leadKey          String
-  engineLeadId     Int?
-  businessName     String
-  contactName      String?
-  contactRole      String?
-  email            String
-  emailStatus      String    @default("VERIFIED")
-  researchSnapshot Json
-  opportunity      String?
-  outreachAngle    String?
-  subject          String
-  body             String
-  followupPlan     Json
-  plannerModel     String?
-  confidence       String    @default("medium")
-  status           String    @default("READY_FOR_APPROVAL")
-  approvalId       String?
-  sendId           String?
-  deliveryStatus   String?
-  replyStatus      String?
-  sendError        String?
-  senderIdentity   String?
-  aiEnabled        Boolean   @default(false) @map("ai_enabled")
-  aiModel          String?   @map("ai_model")
-  enrichmentStatus String?   @map("enrichment_status")
-  selectedService  String?   @map("selected_service")
-  personalizationContext Json? @map("personalization_context")
-  submittedAt      DateTime?
-  decidedAt        DateTime?
-  sentAt           DateTime?
-  cancelledAt      DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                     String    @id @default(cuid())
+  tenantId               String
+  version                Int       @default(1)
+  leadKey                String
+  engineLeadId           Int?
+  businessName           String
+  contactName            String?
+  contactRole            String?
+  email                  String
+  emailStatus            String    @default("VERIFIED")
+  researchSnapshot       Json
+  opportunity            String?
+  outreachAngle          String?
+  subject                String
+  body                   String
+  followupPlan           Json
+  plannerModel           String?
+  confidence             String    @default("medium")
+  status                 String    @default("READY_FOR_APPROVAL")
+  approvalId             String?
+  sendId                 String?
+  deliveryStatus         String?
+  replyStatus            String?
+  sendError              String?
+  senderIdentity         String?
+  aiEnabled              Boolean   @default(false) @map("ai_enabled")
+  aiModel                String?   @map("ai_model")
+  enrichmentStatus       String?   @map("enrichment_status")
+  selectedService        String?   @map("selected_service")
+  personalizationContext Json?     @map("personalization_context")
+  submittedAt            DateTime?
+  decidedAt              DateTime?
+  sentAt                 DateTime?
+  cancelledAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  followups         FollowUp[]
-  lifecycleEvents   LeadLifecycleEvent[]
+  followups       FollowUp[]
+  lifecycleEvents LeadLifecycleEvent[]
 
   @@unique([tenantId, leadKey, version])
   @@index([tenantId, status])
@@ -442,12 +444,12 @@ model Deliverable {
 
 // --- Automation OS ------------------------------------------------------
 model IntegrationStatus {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   tenantId      String
   key           String
   state         String
   detail        String?
-  lastCheckedAt DateTime @default(now())
+  lastCheckedAt DateTime  @default(now())
   lastOkAt      DateTime?
 
   @@unique([tenantId, key])
@@ -458,35 +460,35 @@ model IntegrationStatus {
 // dedicated Ollama account). credentialRef is a REFERENCE (e.g. "env:VAR")
 // resolved server-side; secrets never live in the database.
 model ClientAiConfig {
-  id           String   @id @default(cuid())
-  tenantId     String   @unique
-  aiEnabled    Boolean  @default(false)
-  provider     String   @default("ollama_cloud")
-  baseUrl      String?
-  model        String?
+  id            String   @id @default(cuid())
+  tenantId      String   @unique
+  aiEnabled     Boolean  @default(false)
+  provider      String   @default("ollama_cloud")
+  baseUrl       String?
+  model         String?
   credentialRef String?
-  obsidianRoot String?
-  config       Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  obsidianRoot  String?
+  config        Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([tenantId])
 }
 
 // Per-tenant usage ledger for every gateway call.
 model AiUsageLog {
-  id            String   @id @default(cuid())
-  tenantId      String
-  operation     String
-  provider      String
-  model         String
-  status        String
-  inputTokens   Int?
-  outputTokens  Int?
+  id               String   @id @default(cuid())
+  tenantId         String
+  operation        String
+  provider         String
+  model            String
+  status           String
+  inputTokens      Int?
+  outputTokens     Int?
   estimatedCostUsd Float?
-  latencyMs     Int?
-  error         String?
-  createdAt     DateTime @default(now())
+  latencyMs        Int?
+  error            String?
+  createdAt        DateTime @default(now())
 
   @@index([tenantId, createdAt])
 }
@@ -495,41 +497,41 @@ model AiUsageLog {
 // Canonical client business context — one per tenant, tenant-isolated.
 // The OS converts this context into an acquisition operation. No tier gating.
 model AcquisitionProfile {
-  id                       String                    @id @default(cuid())
-  tenantId                 String                    @unique
-  status                   String                    @default("DRAFT")
-  version                  Int                       @default(1)
+  id                     String                  @id @default(cuid())
+  tenantId               String                  @unique
+  status                 String                  @default("DRAFT")
+  version                Int                     @default(1)
   // 1 COMPANY
-  companyName              String?
-  website                  String?
-  industry                 String?
-  whatWeSell               String?
-  productsServices         Json?
-  locationsServed          Json?
-  businessModel            String?
+  companyName            String?
+  website                String?
+  industry               String?
+  whatWeSell             String?
+  productsServices       Json?
+  locationsServed        Json?
+  businessModel          String?
   // 2 OBJECTIVE
-  acquisitionObjective     String?
-  primaryObjective         String?
-  targetQuantity           Int?
-  targetTimeframe          String?
-  priorityProductService   String?
+  acquisitionObjective   String?
+  primaryObjective       String?
+  targetQuantity         Int?
+  targetTimeframe        String?
+  priorityProductService String?
   // 3 ICP
-  icp                      Json?
+  icp                    Json?
   // 5 OFFER
-  offer                    Json?
+  offer                  Json?
   // 6 BRAND
-  brand                    Json?
+  brand                  Json?
   // 7 INFRA
-  integrations             Json?
+  integrations           Json?
   // 8 RULES
-  rules                    Json?
-  readiness                Json?
-  activatedAt              DateTime?
-  pausedAt                 DateTime?
-  suspendedAt              DateTime?
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  dataImports              AcquisitionDataImport[]
+  rules                  Json?
+  readiness              Json?
+  activatedAt            DateTime?
+  pausedAt               DateTime?
+  suspendedAt            DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  dataImports            AcquisitionDataImport[]
 
   @@index([tenantId, status])
   @@map("AcquisitionProfile")
@@ -571,4 +573,52 @@ model WavesHandoffToken {
   @@index([tenantId])
   @@index([expiresAt])
   @@map("WavesHandoffToken")
+}
+
+// --- Client-facing milestone notifications ---------------------------------
+// Idempotent, tenant-scoped. The engine writes one row per event x channel.
+// `NotificationPreference` toggles delivery by category x channel.
+// RLS policy applied by the add_notifications migration.
+model Notification {
+  id             String    @id @default(cuid())
+  tenantId       String
+  userId         String?
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventType      String
+  title          String
+  message        String
+  cycleId        String?
+  campaignId     String?
+  resourceType   String?
+  resourceId     String?
+  resourceHref   String?
+  channel        String    @default("in_app")
+  read           Boolean   @default(false)
+  readAt         DateTime?
+  delivered      Boolean   @default(false)
+  deliveredAt    DateTime?
+  idempotencyKey String    @unique
+  metadata       Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tenantId, read, createdAt(sort: Desc)])
+  @@index([tenantId, userId])
+  @@index([tenantId, eventType])
+  @@map("Notification")
+}
+
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category  String
+  channel   String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, category, channel])
+  @@index([tenantId])
+  @@map("NotificationPreference")
 }

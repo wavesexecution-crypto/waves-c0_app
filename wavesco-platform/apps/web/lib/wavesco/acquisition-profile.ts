@@ -79,6 +79,8 @@ export type IntegrationsSection = {
   website?: string | null;
   whatsapp?: string | null;
   other?: string | null;
+  /** Client email operating mode: "waves_managed" (default) | "client_managed". */
+  emailMode?: string | null;
 };
 
 export type RulesSection = {

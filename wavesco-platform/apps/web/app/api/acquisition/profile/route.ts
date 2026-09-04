@@ -20,6 +20,27 @@ function isUnauthorized(e: unknown): boolean {
   );
 }
 
+/**
+ * Strip server-side secrets before any profile leaves the server.
+ * Never expose the encrypted storage credential blob to the browser.
+ */
+function sanitizeProfileForClient(
+  profile: AcquisitionProfileRecord | null,
+): AcquisitionProfileRecord | null {
+  if (!profile) return profile;
+  const clone = { ...profile } as Record<string, unknown>;
+  const integrations = clone.integrations as Record<string, unknown> | null | undefined;
+  if (integrations && typeof integrations === "object") {
+    const safeIntegrations = JSON.parse(JSON.stringify(integrations)) as Record<string, unknown>;
+    const storage = safeIntegrations.storage as Record<string, unknown> | null | undefined;
+    if (storage && typeof storage === "object") {
+      delete storage.cred; // encrypted credential blob — server-side only
+    }
+    clone.integrations = safeIntegrations;
+  }
+  return clone as AcquisitionProfileRecord;
+}
+
 // GET — tenant-isolated profile + readiness
 export async function GET() {
   try {
@@ -38,7 +59,8 @@ export async function GET() {
     }
 
     const readiness = readinessCheck(result as AcquisitionProfileRecord);
-    return NextResponse.json({ profile: result, readiness, exists: true });
+    const profile = sanitizeProfileForClient(result as AcquisitionProfileRecord);
+    return NextResponse.json({ profile, readiness, exists: true });
   } catch (e) {
     if (isUnauthorized(e)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     const msg = e instanceof Error ? e.message : String(e);
@@ -119,7 +141,7 @@ export async function POST(req: Request) {
         });
       }
       const readiness = readinessCheck(profile as AcquisitionProfileRecord);
-      return { profile, readiness };
+      return { profile: sanitizeProfileForClient(profile as AcquisitionProfileRecord), readiness };
     });
 
     return NextResponse.json(result, { status: 200 });

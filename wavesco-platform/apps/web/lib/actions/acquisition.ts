@@ -15,6 +15,10 @@ import {
   updateLeadOutreachState,
 } from "@/lib/wavesco/lead-engine";
 import { recordActivity } from "@/lib/wavesco/activity";
+import {
+  onLeadGenerationCompleted,
+  onLeadReportReady,
+} from "@/lib/wavesco/notify";
 
 async function requireUser(): Promise<{ tenantId: string; userId: string; role: string }> {
   const session = await auth();
@@ -139,6 +143,21 @@ export async function getGenerationStatusAction(
               logTail: tail?.slice(-2000) ?? row.logTail,
             },
           });
+          // Real transition (serverless poll): batch confirmed completed.
+          const suffix = `batch-${requestId}`;
+          onLeadGenerationCompleted(
+            user.tenantId,
+            undefined,
+            {
+              leadCount: manifest.leadCount ?? undefined,
+              qualifiedCount: manifest.emailReadyCount ?? undefined,
+            },
+            undefined,
+            suffix,
+          );
+          if (manifest.pdfPath || manifest.excelPath) {
+            onLeadReportReady(user.tenantId, undefined, {}, undefined, suffix);
+          }
           const updated = await tx.generationBatch.findUnique({ where: { requestId } });
           if (updated) {
             return {

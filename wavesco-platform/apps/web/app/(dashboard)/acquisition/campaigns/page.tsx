@@ -214,7 +214,7 @@ export default async function CampaignsPage() {
         ) : (
           <div className="space-y-3">
             {await Promise.all(
-              campaigns.map(async (c) => {
+              campaigns.map(async (c: any) => {
                 let eligibleNow = 0;
                 try {
                   const candidates = await selectCampaignCandidates({

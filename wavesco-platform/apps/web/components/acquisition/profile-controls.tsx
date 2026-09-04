@@ -124,8 +124,10 @@ export function ProfileQuickForm({
     for (const [k, v] of Object.entries(payload)) {
       if (k.includes(".")) {
         const [group, sub] = k.split(".", 2);
-        if (!jsonGroups[group]) jsonGroups[group] = { ...(((initial as any)[group] as Record<string, unknown>) || {}) };
-        jsonGroups[group][sub] = v;
+        if (group && sub) {
+          if (!jsonGroups[group]) jsonGroups[group] = { ...(((initial as any)[group] as Record<string, unknown>) || {}) };
+          jsonGroups[group][sub] = v;
+        }
       } else {
         body[k] = v;
       }

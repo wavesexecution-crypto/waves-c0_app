@@ -12,6 +12,11 @@ import {
   startGenerationRemote,
   getLastEngineRun,
 } from "./lead-engine";
+import {
+  onCycleStarted,
+  onLeadGenerationCompleted,
+  onLeadReportReady,
+} from "./notify";
 
 /**
  * Spawns the REAL Lead Engine CLI (run.py) as a detached child process
@@ -38,6 +43,37 @@ const STAGE_RULES: { match: RegExp; stage: string }[] = [
 
 export function logFileFor(requestId: string): string {
   return join(runsDir(), `web-${requestId}.log`);
+}
+
+/**
+ * Fire client milestone notifications once a GenerationBatch is confirmed
+ * completed (REAL transition). Idempotency is keyed per-batch via a
+ * deterministic deduplication suffix, so safe across worker retries and the
+ * multiple completion code paths.
+ */
+function notifyGenerationMilestones(args: {
+  tenantId: string;
+  requestId: string;
+  resultLeadCount: number | null;
+  emailReadyCount: number | null;
+  pdfPath: string | null;
+  excelPath: string | null;
+}): void {
+  const suffix = `batch-${args.requestId}`;
+  onLeadGenerationCompleted(
+    args.tenantId,
+    undefined,
+    {
+      leadCount: args.resultLeadCount ?? undefined,
+      qualifiedCount: args.emailReadyCount ?? undefined,
+    },
+    undefined,
+    suffix,
+  );
+  // Report is only "ready" when it was actually generated & stored.
+  if (args.pdfPath || args.excelPath) {
+    onLeadReportReady(args.tenantId, undefined, {}, undefined, suffix);
+  }
 }
 
 function tailFile(path: string, maxBytes = 4000): string | null {
@@ -113,6 +149,9 @@ export async function startGeneration(
       });
     });
 
+    // Real transition: batch is now running — the acquisition cycle started working.
+    onCycleStarted(tenantId, undefined, undefined, `batch-${requestId}`);
+
     // Poll the remote engine for completion without blocking the request.
     monitorGenerationRemote(requestId, tenantId);
     return { ok: true, requestId };
@@ -176,6 +215,9 @@ export async function startGeneration(
       });
     });
 
+    // Real transition: the engine process is running — cycle started working.
+    onCycleStarted(tenantId, undefined, undefined, `batch-${requestId}`);
+
     monitorGeneration(requestId, tenantId, pid);
     return { ok: true, requestId };
   } catch (e) {
@@ -237,6 +279,15 @@ export function monitorGenerationRemote(requestId: string, tenantId: string): vo
             },
           }),
         );
+        // Real transition: batch confirmed completed with its report stored.
+        notifyGenerationMilestones({
+          tenantId,
+          requestId,
+          resultLeadCount: manifest.leadCount ?? null,
+          emailReadyCount: manifest.emailReadyCount ?? null,
+          pdfPath: manifest.pdfPath ?? null,
+          excelPath: manifest.excelPath ?? null,
+        });
         clearInterval(timer);
         watched.delete(requestId);
         return;
@@ -338,6 +389,15 @@ async function finalizeIfComplete(tenantId: string, requestId: string): Promise<
           finishedAt: new Date(),
           logTail: tail?.slice(-2000) ?? null,
         },
+      });
+      // Real transition: batch confirmed completed with its report stored.
+      notifyGenerationMilestones({
+        tenantId,
+        requestId,
+        resultLeadCount: manifest.leadCount ?? null,
+        emailReadyCount: manifest.emailReadyCount ?? null,
+        pdfPath: manifest.pdfPath ?? null,
+        excelPath: manifest.excelPath ?? null,
       });
     } else {
       await tx.generationBatch.update({

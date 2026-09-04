@@ -18,6 +18,8 @@ import {
 export { classifyEmail } from "./outreach-logic";
 import { n8nBaseUrl, submitApproval } from "./n8n";
 import { appendNote, putNote, readNote } from "./obsidian";
+import { onCampaignDeployed, onEmailsReadyForReview, onNewResponsesDetected, onPositiveResponseDetected, processDueFollowUpMilestones } from "./notify";
+import { appendUnsubscribeFooter, buildUnsubscribeUrl, isRecipientSuppressed, suppressRecipient } from "./unsubscribe";
 
 /**
  * Lead Intelligence → Email Outreach Order Pipeline.
@@ -390,6 +392,11 @@ export async function createOutreachOrder(
     });
     if (emailTaken) return { ok: false as const, error: "Another live order already targets this email address." };
 
+    // Suppression guard: a recipient who unsubscribed must never be re-contacted.
+    if (await isRecipientSuppressed(tx, tenantId, verifiedEmail)) {
+      return { ok: false as const, error: "This recipient has previously unsubscribed and is permanently suppressed." };
+    }
+
     const order = await tx.outreachOrder.create({
       data: {
         tenantId,
@@ -436,6 +443,16 @@ export async function createOutreachOrder(
       },
     });
 
+    // Real transition: outreach order drafted and ready for client approval.
+    onEmailsReadyForReview(
+      tenantId,
+      undefined,
+      undefined,
+      { emailCount: 1, prospectName: lead.business },
+      undefined,
+      `order-${order.id}`,
+    );
+
     void userId;
     return { ok: true as const, orderId: order.id };
   });
@@ -457,11 +474,23 @@ export async function submitOrderToApproval(
       return { ok: false as const, error: `Order is ${order.status}; only READY_FOR_APPROVAL can be queued.` };
     }
 
+    // Suppression guard (re-checked at queue time — the recipient may have
+    // unsubscribed after the order was drafted).
+    if (await isRecipientSuppressed(tx, tenantId, order.email)) {
+      return { ok: false as const, error: "This recipient has unsubscribed and cannot be contacted." };
+    }
+
     const res = await submitApproval({
       type: "cold_email",
       recipient: order.email,
       subject: order.subject,
-      body: order.body,
+      // Legal/compliance: every outbound email carries an authenticated,
+      // working unsubscribe link (HMAC-signed, tenant + recipient bound).
+      body: appendUnsubscribeFooter(
+        order.body,
+        order.businessName,
+        buildUnsubscribeUrl(tenantId, order.email),
+      ),
     });
     if (!res.ok) {
       return { ok: false as const, error: `Approval Queue unreachable (HTTP ${res.status}): ${res.error ?? ""}` };
@@ -520,6 +549,14 @@ export async function decideOrderApproval(
     if (order?.tenantId !== tenantId) return { proceed: false, reason: "Order not found." };
     if (order.decidedAt) return { proceed: false, reason: `Already decided (${order.status}).` };
     if (!order.approvalId) return { proceed: false, reason: "Order was never submitted to the Approval Queue." };
+    // Suppression guard: refuse approval if the recipient unsubscribed after queuing.
+    if (await isRecipientSuppressed(tx, tenantId, order.email)) {
+      await tx.outreachOrder.update({
+        where: { id: orderId },
+        data: { status: "CANCELLED", decidedAt: new Date(), sendError: "Recipient unsubscribed before approval" },
+      });
+      return { proceed: false, reason: "Recipient has unsubscribed; this order was cancelled." };
+    }
     const numeric = Number(order.approvalId);
     if (!Number.isFinite(numeric)) return { proceed: false, reason: "Non-numeric approval id — use Telegram approve instead." };
     return { proceed: true, approvalNumeric: numeric };
@@ -658,6 +695,15 @@ export async function reconcileOrderSend(tenantId: string, orderId: string): Pro
           sendError: null,
         },
       });
+      // Real transition: order actually confirmed sent by the provider.
+      onCampaignDeployed(
+        tenantId,
+        undefined,
+        undefined,
+        { prospectName: order.businessName },
+        undefined,
+        `order-${orderId}`,
+      );
       await scheduleFollowUpsAfterSend(tenantId, orderId, tx);
       await logDecisionToObsidian(order.businessName, order.email, "SENT", senderIdentity.slice(0, 80));
       await tx.activityEvent.create({
@@ -752,22 +798,85 @@ async function scheduleFollowUpsAfterSend(tenantId: string, orderId: string, tx:
   }
 }
 
+/**
+ * Conservative positive-reply classification.
+ *
+ * The platform has no sentiment classifier; `reply_status` is a raw class
+ * string from the lead engine corpus. Only EXPLICIT positive markers are
+ * treated as a positive response — never every reply.
+ */
+function isPositiveReply(status?: string | null): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  if (!s || ["none", "no reply", "no", "unsubscribed", "unsubscribe"].includes(s)) {
+    return false;
+  }
+  const positive = [
+    "interested",
+    "positive",
+    "yes",
+    "keen",
+    "buying",
+    "available",
+    "want to",
+    "would like",
+    "great",
+    "perfect",
+    "sounds good",
+    "interested in",
+    "positive response",
+  ];
+  return positive.some((p) => s.includes(p));
+}
+
 /** Marks reply/bounce telemetry onto orders from corpus state changes. */
 export async function syncOrderReplyStates(tenantId: string): Promise<number> {
   return withTenantContext(tenantId, async (tx) => {
     const orders = await tx.outreachOrder.findMany({
       where: { tenantId, status: { in: ["SENT", "DELIVERED"] } },
-      select: { id: true, leadKey: true, replyStatus: true },
+      select: { id: true, leadKey: true, replyStatus: true, businessName: true, email: true },
     });
     let updated = 0;
     for (const o of orders) {
       const lead = getEngineLead(o.leadKey);
       if (!lead) continue;
+      const replyRaw = lead.reply_status?.trim() ?? "";
+      // Real unsubscribe event from the corpus: persistently suppress the
+      // recipient (idempotent), cancel pending follow-ups, and skip reply
+      // processing for this order entirely.
+      if (["unsubscribed", "unsubscribe"].includes(replyRaw.toLowerCase())) {
+        await suppressRecipient(tx, tenantId, o.email, "corpus_reply_sync");
+        await tx.followUp.updateMany({
+          where: { tenantId, outreachOrderId: o.id, status: "pending" },
+          data: { status: "cancelled" },
+        });
+        continue;
+      }
       const replied =
-        lead.reply_status && !["none", "no reply", "no", ""].includes(lead.reply_status.trim().toLowerCase());
-      if (replied && o.replyStatus !== lead.reply_status) {
-        await tx.outreachOrder.update({ where: { id: o.id }, data: { replyStatus: lead.reply_status ?? "yes" } });
+        replyRaw && !["none", "no reply", "no", ""].includes(replyRaw.toLowerCase());
+      if (replied && o.replyStatus !== replyRaw) {
+        const reply = replyRaw || "yes";
+        await tx.outreachOrder.update({ where: { id: o.id }, data: { replyStatus: reply } });
         updated += 1;
+        // Real transition: a genuinely new reply arrived. Dedup keyed by the
+        // concrete reply string so a repeated sync never re-notifies.
+        onNewResponsesDetected(
+          tenantId,
+          undefined,
+          undefined,
+          { responseCount: 1, prospectName: o.businessName },
+          `reply:${o.id}:${reply.toLowerCase()}`.slice(0, 200),
+        );
+        // Only explicit positive markers classify as a positive response.
+        if (isPositiveReply(reply)) {
+          onPositiveResponseDetected(
+            tenantId,
+            undefined,
+            undefined,
+            { prospectName: o.businessName },
+            `prospect:${o.id}:${reply.toLowerCase()}`.slice(0, 200),
+          );
+        }
       }
       if (lead.bounced === 1) {
         await tx.outreachOrder.update({ where: { id: o.id }, data: { deliveryStatus: "bounced" } });
@@ -779,6 +888,10 @@ export async function syncOrderReplyStates(tenantId: string): Promise<number> {
         updated += 1;
       }
     }
+
+    // Real server reconciliation: also evaluate due follow-ups (idempotent).
+    await processDueFollowUpMilestones(tenantId);
+
     return updated;
   });
 }
