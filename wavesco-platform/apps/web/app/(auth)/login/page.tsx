@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 export default async function LoginPage({ searchParams }: { searchParams?: { callbackUrl?: string } }) {
   const session = await auth();
   const email = (session as any)?.user?.email as string | undefined;
-  const isRecognized = typeof email === "string" && email.length > 0;
+  const tenantId = (session as any)?.user?.tenantId as string | undefined;
+  const isRecognized = (typeof email === "string" && email.length > 0) || (typeof tenantId === "string" && tenantId.length > 0);
 
   // If Waves profile already recognized via shared .wavesco.in cookie — no app sign-in needed
   if (isRecognized) {
