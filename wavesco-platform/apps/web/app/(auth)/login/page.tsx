@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wavesco/ui";
-import { LoginForm } from "./login-form";
 import { auth } from "@/lib/auth";
 
 export const metadata: Metadata = {
@@ -34,17 +32,22 @@ export default async function LoginPage({ searchParams }: { searchParams?: { cal
     redirect(dest);
   }
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sign in to your Waves account</CardTitle>
-        <CardDescription>Use your Waves credentials to access the app.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Suspense>
-          <LoginForm />
-        </Suspense>
-      </CardContent>
-    </Card>
-  );
+  // Not recognized — single auth system on main site
+  const wavesMain = (process.env.WAVES_MAIN_URL || "https://wavesco.in").replace(/\/$/, "");
+  const rawCb = searchParams?.callbackUrl ?? "/overview";
+  let appCallback: string;
+  if (rawCb.startsWith("/") && !rawCb.startsWith("//")) {
+    appCallback = `https://app.wavesco.in${rawCb}`;
+  } else {
+    try {
+      const dest = new URL(rawCb);
+      const allowed = ["wavesco.in", "app.wavesco.in", "www.wavesco.in"];
+      if (allowed.some((h) => dest.hostname === h || dest.hostname.endsWith("." + h))) appCallback = rawCb;
+      else appCallback = "https://app.wavesco.in/overview";
+    } catch {
+      appCallback = "https://app.wavesco.in/overview";
+    }
+  }
+  redirect(`${wavesMain}/login?callbackUrl=${encodeURIComponent(appCallback)}`);
+
 }
