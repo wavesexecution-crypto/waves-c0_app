@@ -5,6 +5,6 @@ export const metadata = {
 };
 
 export default function VerifyPage() {
-  const wavesMain = (process.env.WAVES_MAIN_URL || "https://wavesco.in").replace(//$/, "");
+  const wavesMain = (process.env.WAVES_MAIN_URL || "https://wavesco.in").replace(/\/$/, "");
   redirect(`${wavesMain}/login`);
 }
