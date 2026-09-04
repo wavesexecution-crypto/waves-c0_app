@@ -145,12 +145,13 @@ export const authConfig: NextAuthConfig = {
       // Only copy claims from `user` when it is actually present; the token
       // already carries them on every subsequent request.
       const authUser = user as
-        | { id?: string; tenantId?: string; role?: string }
+        | { id?: string; tenantId?: string; role?: string; email?: string }
         | undefined;
       if (authUser?.id) {
         token.id = authUser.id;
         token.tenantId = authUser.tenantId ?? "";
         token.role = authUser.role ?? "member";
+        (token as any).email = (authUser as any).email ?? (token as any).email ?? "";
       }
       if (trigger === "update") {
         // Allow server-side session refreshes (tenant data may change).
@@ -164,6 +165,7 @@ export const authConfig: NextAuthConfig = {
       session.user.id = typeof t.id === "string" ? t.id : "";
       session.user.tenantId = typeof t.tenantId === "string" ? t.tenantId : "";
       session.user.role = typeof t.role === "string" ? t.role : "member";
+      (session.user as any).email = typeof (t as any).email === "string" ? (t as any).email : (session.user as any).email ?? "";
       return session;
     },
   },
