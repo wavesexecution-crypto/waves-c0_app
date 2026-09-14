@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 import { getLeadStats, getFacets, getLastEngineRun } from "@/lib/wavesco/lead-engine";
+import { logEngineError } from "@/lib/wavesco/engine-errors";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
 
     // --- Corpus (Lead Engine) with fallback ---
     let corpus = {
@@ -22,7 +25,7 @@ export async function GET() {
     };
     let facets = { categories: [] as string[], cities: [] as string[] };
     let lastRun: Awaited<ReturnType<typeof getLastEngineRun>> = null as unknown as Awaited<ReturnType<typeof getLastEngineRun>>;
-    let leadEngine: { status: "ok" | "error"; detail: string } = { status: "ok", detail: "reachable" };
+    let leadEngine: { status: "ok" | "error"; detail: string } = { status: "ok", detail: "Operational" };
 
     try {
       const stats = await getLeadStats();
@@ -48,11 +51,12 @@ export async function GET() {
       } catch {
         lastRun = undefined;
       }
-      leadEngine = { status: "ok", detail: facets.categories.length > 0 || facets.cities.length > 0 ? "corpus reachable" : "Lead Engine reachable" };
+      leadEngine = { status: "ok", detail: "Operational" };
     } catch (e) {
+      logEngineError("overview:corpus", e);
       leadEngine = {
         status: "error",
-        detail: e instanceof Error ? e.message : "Lead Engine unreachable",
+        detail: "Temporarily unavailable",
       };
       // corpus stays zeroed, facets empty, lastRun null
       facets = { categories: [], cities: [] };
@@ -62,7 +66,7 @@ export async function GET() {
     // --- Platform counts + recent activity (tenant-scoped) ---
     let platform = { campaigns: 0, queued: 0, sent: 0, failed: 0, followUpsPending: 0 };
     let recentActivity: unknown[] = [];
-    let db: { status: "ok" | "error"; detail: string } = { status: "ok", detail: "connected" };
+    let db: { status: "ok" | "error"; detail: string } = { status: "ok", detail: "Operational" };
 
     try {
       const result = await withTenantContext(tenantId, async (tx: any) => {
@@ -89,7 +93,8 @@ export async function GET() {
       };
       recentActivity = result.activity;
     } catch (e) {
-      db = { status: "error", detail: e instanceof Error ? e.message : "db error" };
+      logEngineError("overview:platform", e);
+      db = { status: "error", detail: "Temporarily unavailable" };
       // platform stays zeroed, recentActivity empty
     }
 
@@ -97,9 +102,9 @@ export async function GET() {
     const n8nBase = (process.env.N8N_BASE_URL ?? "").trim();
     let n8n: { status: "ok" | "missing" | "error"; detail: string };
     if (!n8nBase) {
-      n8n = { status: "missing", detail: "N8N_BASE_URL not configured" };
+      n8n = { status: "missing", detail: "Not configured" };
     } else {
-      n8n = { status: "ok", detail: "n8n configured" };
+      n8n = { status: "ok", detail: "Configured" };
     }
 
     const system = { leadEngine, db, n8n };
@@ -124,6 +129,7 @@ export async function GET() {
     if (isUnauthorized) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({ error: "internal", detail: msg }, { status: 500 });
+    logEngineError("overview:unhandled", e);
+    return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

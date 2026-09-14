@@ -9,6 +9,8 @@ import {
   listBatchManifests,
 } from "@/lib/wavesco/lead-engine";
 import { computeIntegrationStatuses } from "@/lib/wavesco/integrations";
+import { EngineUnavailableError, logEngineError, toSafeEngineError } from "@/lib/wavesco/engine-errors";
+import { EngineStatusCard } from "@/components/acquisition/engine-status";
 import { backfillBatchActivity } from "@/lib/wavesco/activity";
 import { getExecutions, getWorkflows, n8nApiKey, type N8nExecutionSummary, type N8nWorkflowSummary } from "@/lib/wavesco/n8n";
 import { AutoRefresh } from "@/components/command/auto-refresh";
@@ -29,11 +31,12 @@ interface ActivityRow {
   createdAt: Date;
 }
 
-async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<{ data: T; error: string | null }> {
+async function safe<T>(fn: () => Promise<T>, fallback: T, scope: string): Promise<{ data: T; failed: boolean }> {
   try {
-    return { data: await fn(), error: null };
+    return { data: await fn(), failed: false };
   } catch (e) {
-    return { data: fallback, error: e instanceof Error ? e.message : "unavailable" };
+    logEngineError(scope, e);
+    return { data: fallback, failed: true };
   }
 }
 
@@ -58,7 +61,7 @@ export default async function CommandCenterPage() {
     bounced: 0,
     replies: 0,
     lastResearchedAt: null,
-  });
+  }, "command:stats");
 
   const platformCounts = await withTenantContext(tenantId, async (tx) => ({
     emailsSent: await tx.outreachEmail.count({ where: { tenantId, status: "sent" } }),
@@ -86,12 +89,12 @@ export default async function CommandCenterPage() {
     ok: false,
     status: 0,
     reason: "no_api_key" as const,
-  });
+  }, "command:workflows");
   const executions = await safe(() => getExecutions(50), {
     ok: false,
     status: 0,
     reason: "no_api_key" as const,
-  });
+  }, "command:executions");
 
   const wfData = (workflows.data.data ?? null) as { data?: N8nWorkflowSummary[] } | null;
   const exData = (executions.data.data ?? null) as { data?: N8nExecutionSummary[] } | null;
@@ -101,10 +104,18 @@ export default async function CommandCenterPage() {
   const n8nKeyPresent = Boolean(n8nApiKey());
 
   // ---- SYSTEMS ----------------------------------------------------------
-  const systems = await computeIntegrationStatuses(tenantId);
+  // Never let integration probing crash the console: degrade to an empty
+  // system list (the acquisition section above already shows engine state).
+  let systems: Awaited<ReturnType<typeof computeIntegrationStatuses>> = [];
+  try {
+    systems = await computeIntegrationStatuses(tenantId);
+  } catch (e) {
+    logEngineError("command:systems", e);
+    systems = [];
+  }
 
-  const engineRun = await safe(async () => getLastEngineRun(), undefined);
-  const schedTask = await safe(() => getScheduledTaskInfo(), null);
+  const engineRun = await safe(async () => getLastEngineRun(), undefined, "command:lastrun");
+  const schedTask = await safe(() => getScheduledTaskInfo(), null, "command:schedtask");
 
   // ---- RECENT ACTIVITY --------------------------------------------------
   try {
@@ -121,7 +132,7 @@ export default async function CommandCenterPage() {
     }),
   ) as ActivityRow[];
 
-  const manifests = await safe(async () => (await listBatchManifests()).slice(0, 3), []);
+  const manifests = await safe(async () => (await listBatchManifests()).slice(0, 3), [], "command:manifests");
   const n8nSystem = systems.find((s) => s.key === "n8n");
 
   return (
@@ -145,20 +156,14 @@ export default async function CommandCenterPage() {
         <SectionHeader
           title="Acquisition"
           subtitle={
-            stats.error
-              ? `Lead Engine unavailable: ${stats.error}`
+            stats.failed
+              ? "Lead research is reconnecting"
               : `Corpus last researched ${relativeFrom(stats.data.lastResearchedAt)}`
           }
-          right={<StatusPill state={stats.error ? "error" : "live"} />}
+          right={<StatusPill state={stats.failed ? "error" : "live"} />}
         />
-        {stats.error ? (
-          <div className="rounded-lg border border-dashed border-red-500/40 p-4 text-sm">
-            <p className="font-medium">Lead Engine unreachable</p>
-            <p className="text-muted-foreground">{stats.error}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              The lead research service is reconnecting. Try Refresh in a moment.
-            </p>
-          </div>
+        {stats.failed ? (
+          <EngineStatusCard error={toSafeEngineError(new EngineUnavailableError())} />
         ) : (
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -185,7 +190,7 @@ export default async function CommandCenterPage() {
           </div>
         )}
         <p className="text-[11px] text-muted-foreground">
-          Sources: lead database ({stats.error ? "unreachable" : "live"}) for corpus metrics · PostgreSQL for
+          Sources: lead research ({stats.failed ? "reconnecting" : "live"}) for pipeline metrics · Workspace database for
           campaign/outreach/follow-up/client state · delivery rate appears only after real sends occur.
         </p>
       </section>
@@ -207,7 +212,7 @@ export default async function CommandCenterPage() {
               Workflow activity will appear here automatically once monitoring is enabled for your workspace.
             </p>
           </div>
-        ) : workflows.error || !wfData?.data ? (
+        ) : workflows.failed || !wfData?.data ? (
           <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
             Automation activity is temporarily unavailable.
             <span className="mt-2 block text-xs">Last updated: {formatIST(generatedAt)}</span>
@@ -246,7 +251,7 @@ export default async function CommandCenterPage() {
             </div>
           ))}
         </div>
-        {engineRun.data && !engineRun.error ? (
+        {engineRun.data && !engineRun.failed ? (
           <p className="text-[11px] text-muted-foreground">
             Lead Engine last run: started {formatIST(engineRun.data.started_at)} · finished{" "}
             {formatIST(engineRun.data.finished_at)} · added {engineRun.data.added ?? 0} leads · Telegram:{" "}

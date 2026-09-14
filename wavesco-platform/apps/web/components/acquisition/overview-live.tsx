@@ -30,7 +30,7 @@ function mapState(state: string): string {
 
 export function OverviewLive() {
   const [data, setData] = useState<OverviewResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [liveDown, setLiveDown] = useState(false);
   const [lastFetchAt, setLastFetchAt] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -40,34 +40,34 @@ export function OverviewLive() {
     async function fetchOverview() {
       try {
         const res = await fetch("/api/acquisition/overview", { cache: "no-store" });
-        if (!res.ok) {
-          if (res.status === 401) throw new Error("unauthorized");
-          throw new Error(`HTTP ${res.status}`);
-        }
+        if (!res.ok) throw new Error("overview unavailable");
         const json = (await res.json()) as OverviewResponse;
         if (!cancelled) {
           setData(json);
-          setError(null);
+          setLiveDown(false);
           setLastFetchAt(new Date());
         }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } catch {
+        // Customer-safe: never render status codes or exception text.
+        if (!cancelled) setLiveDown(true);
       }
     }
 
-    fetchOverview();
-    interval = setInterval(fetchOverview, 30_000);
+    void fetchOverview();
+    interval = setInterval(() => {
+      void fetchOverview();
+    }, 30_000);
     return () => {
       cancelled = true;
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
   }, []);
 
-  if (error) {
+  if (liveDown && !data) {
     return (
-      <section className="space-y-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
-        <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Live health unavailable</p>
-        <p className="text-xs text-muted-foreground">{error} — showing server-rendered fallback above.</p>
+      <section className="space-y-3 rounded-lg border border-border/60 bg-card p-4">
+        <p className="text-xs font-medium">Live updates are paused</p>
+        <p className="text-xs text-muted-foreground">Showing the latest saved state. Live updates will resume automatically.</p>
       </section>
     );
   }
@@ -82,6 +82,11 @@ export function OverviewLive() {
 
   const { system, recentActivity, lastRun, corpus, platform } = data;
 
+  // Labels derive from status only — the server sends safe words, but the
+  // customer must never depend on arbitrary detail strings.
+  const healthLabel = (status: string): string =>
+    status === "ok" ? "Operational" : status === "missing" ? "Not configured" : "Temporarily unavailable";
+
   return (
     <div className="space-y-6">
       <section className="space-y-3">
@@ -92,30 +97,30 @@ export function OverviewLive() {
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="flex items-center justify-between rounded-lg border bg-card p-3">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lead Engine</p>
-              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{system.leadEngine.detail}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lead research</p>
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{healthLabel(system.leadEngine.status)}</p>
             </div>
             <StatusPill state={mapState(system.leadEngine.status)} />
           </div>
           <div className="flex items-center justify-between rounded-lg border bg-card p-3">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Database</p>
-              <p className="mt-1 text-xs text-muted-foreground">{system.db.detail}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Workspace</p>
+              <p className="mt-1 text-xs text-muted-foreground">{healthLabel(system.db.status)}</p>
             </div>
             <StatusPill state={mapState(system.db.status)} />
           </div>
           <div className="flex items-center justify-between rounded-lg border bg-card p-3">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">n8n</p>
-              <p className="mt-1 text-xs text-muted-foreground">{system.n8n.detail}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sending</p>
+              <p className="mt-1 text-xs text-muted-foreground">{healthLabel(system.n8n.status)}</p>
             </div>
             <StatusPill state={mapState(system.n8n.status)} />
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-3 text-xs text-muted-foreground">
-          <span>Corpus live: {corpus.total} total · {corpus.emailReady} email-ready · {corpus.contacted} contacted</span>
-          <span>Platform live: {platform.campaigns} campaigns · {platform.queued} queued · {platform.sent} sent</span>
-          <span>{lastRun?.started_at ? `Last run ${formatIST(lastRun.started_at)}` : "No engine runs"}</span>
+          <span>Leads: {corpus.total} total · {corpus.emailReady} ready to contact · {corpus.contacted} contacted</span>
+          <span>Outreach: {platform.campaigns} campaigns · {platform.queued} waiting · {platform.sent} sent</span>
+          <span>{lastRun?.started_at ? `Last research ${formatIST(lastRun.started_at)}` : "No research runs yet"}</span>
         </div>
       </section>
 

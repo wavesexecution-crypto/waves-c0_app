@@ -69,7 +69,7 @@ export async function generateLeadsAction(
   if (!result.ok) {
     await recordActivity(user.tenantId, {
       type: "generation_failed",
-      title: `Lead Engine failed to start: ${result.error}`,
+      title: `Lead research failed to start: ${result.error}`,
       href: "/acquisition/generate",
     });
     return { ok: false, error: result.error };
@@ -77,7 +77,7 @@ export async function generateLeadsAction(
 
   await recordActivity(user.tenantId, {
     type: "generation_started",
-    title: `Lead Engine batch queued — target ${parsed.data.requestedCount} new leads`,
+    title: `Lead research started — finding ${parsed.data.requestedCount} new leads`,
     entityType: "generation",
     entityId: result.requestId,
     href: "/acquisition/generate",

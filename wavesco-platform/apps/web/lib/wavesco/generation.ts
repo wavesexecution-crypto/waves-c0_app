@@ -17,6 +17,7 @@ import {
   onLeadGenerationCompleted,
   onLeadReportReady,
 } from "./notify";
+import { logEngineError } from "./engine-errors";
 
 /**
  * Spawns the REAL Lead Engine CLI (run.py) as a detached child process
@@ -132,7 +133,8 @@ export async function startGeneration(
 
     const remote = await startGenerationRemote(params.requestedCount);
     if (!remote.started) {
-      const msg = remote.error ?? "Lead Engine remote API unreachable";
+      logEngineError("generation:remote-start", remote.error ?? "remote start failed");
+      const msg = "Lead research couldn't start — it's temporarily unavailable.";
       await withTenantContext(tenantId, async (tx) => {
         await tx.generationBatch.update({
           where: { requestId },
@@ -163,10 +165,12 @@ export async function startGeneration(
   const py = pythonExe();
   const script = join(leadEngineRoot(), "run.py");
   if (!existsSync(py)) {
-    return { ok: false, error: `Lead Engine venv not found at ${py}` };
+    logEngineError("generation:local-env", `venv missing at ${py}`);
+    return { ok: false, error: "Lead research can't start here right now." };
   }
   if (!existsSync(script)) {
-    return { ok: false, error: `run.py not found at ${script}` };
+    logEngineError("generation:local-env", `run script missing at ${script}`);
+    return { ok: false, error: "Lead research can't start here right now." };
   }
 
   const requestId = `gen_${randomUUID().replace(/-/g, "").slice(0, 20)}`;
@@ -221,7 +225,8 @@ export async function startGeneration(
     monitorGeneration(requestId, tenantId, pid);
     return { ok: true, requestId };
   } catch (e) {
-    const message = e instanceof Error ? e.message : "spawn failed";
+    logEngineError("generation:spawn", e);
+    const message = "Lead research couldn't start — please try again.";
     await withTenantContext(tenantId, async (tx) => {
       await tx.generationBatch.update({
         where: { requestId },

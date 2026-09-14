@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { getLeadStats } from "@/lib/wavesco/lead-engine";
+import { logEngineError, toSafeEngineError } from "@/lib/wavesco/engine-errors";
+import { EngineStatusCard } from "@/components/acquisition/engine-status";
 import { MetricCard, SectionHeader, StatusPill } from "@/components/command/primitives";
 import { AutoRefresh } from "@/components/command/auto-refresh";
 
@@ -55,7 +57,7 @@ export default async function AnalyticsPage() {
     byTier: {},
     lastResearchedAt: null,
   };
-  let acquisitionError: string | null = null;
+  let engineFailure: unknown = null;
   try {
     const stats = await getLeadStats();
     acquisition = {
@@ -69,7 +71,8 @@ export default async function AnalyticsPage() {
       lastResearchedAt: (stats as any).lastResearchedAt ?? null,
     };
   } catch (e) {
-    acquisitionError = e instanceof Error ? e.message : String(e);
+    logEngineError("analytics:stats", e);
+    engineFailure = e;
   }
 
   // tenant aggregates
@@ -403,24 +406,18 @@ export default async function AnalyticsPage() {
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={30_000} />
-          <StatusPill state={acquisitionError ? "error" : hasData ? "connected" : "unavailable"} />
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">{acquisitionError ? "ERROR" : hasData ? "LIVE" : "EMPTY"}</span>
+          <StatusPill state={engineFailure ? "error" : hasData ? "connected" : "unavailable"} />
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">{engineFailure ? "PAUSED" : hasData ? "LIVE" : "EMPTY"}</span>
         </div>
       </div>
 
-      {acquisitionError ? (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
-          <p className="font-medium text-amber-800 dark:text-amber-200">Lead Engine unreachable — acquisition metrics zeroed</p>
-          <p className="text-muted-foreground">{acquisitionError.slice(0, 300)}</p>
-          <a href="/acquisition/analytics" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
-            Retry
-          </a>
-        </div>
+      {engineFailure ? (
+        <EngineStatusCard error={toSafeEngineError(engineFailure)} />
       ) : null}
       {dbError ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs">
-          <p className="font-medium text-red-600 dark:text-red-400">Tenant DB aggregation warning</p>
-          <p className="text-muted-foreground">{dbError.slice(0, 300)}</p>
+          <p className="font-medium text-red-600 dark:text-red-400">Workspace data is temporarily unavailable</p>
+          <p className="text-muted-foreground">Please try again. Nothing you built is lost.</p>
           <a href="/acquisition/analytics" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
             Retry
           </a>

@@ -87,8 +87,7 @@ export function GeneratePanel({ lastRequestId }: { lastRequestId: string | null 
           </button>
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
-          Runs the existing pipeline: discovery → dedupe → deep research → verification → website probe →
-          scoring → AI enrichment → PDF/Excel → Telegram delivery via Notify Hub.
+          Finds new prospects, researches them, and scores fit — usually in a few minutes.
         </p>
         {state.error ? <p className="mt-2 text-xs text-red-500">{state.error}</p> : null}
         {state.ok && !trackingId ? <p className="mt-2 text-xs text-emerald-600">Queued.</p> : null}
@@ -124,14 +123,14 @@ export function GeneratePanel({ lastRequestId }: { lastRequestId: string | null 
           </ol>
 
           {status?.error ? (
-            <p className="rounded-md border border-red-500/30 bg-red-500/5 p-2 text-xs text-red-500">{status.error}</p>
+            <p className="rounded-md border border-red-500/30 bg-red-500/5 p-2 text-xs text-red-500">This research run hit a problem — please try again. Your workspace is safe.</p>
           ) : null}
 
           {status?.status === "completed" ? (
             <div className="text-sm">
               <p className="text-emerald-600 dark:text-emerald-400">
-                Completed — engine batch {status.engineBatchId}: {status.resultLeadCount ?? "?"} leads,{" "}
-                {status.emailReadyCount ?? "?"} email-ready.
+                Done — {status.resultLeadCount ?? "?"} new leads,{" "}
+                {status.emailReadyCount ?? "?"} ready to contact.
               </p>
               <div className="mt-2 flex gap-2 text-xs">
                 {status.pdfPath ? (

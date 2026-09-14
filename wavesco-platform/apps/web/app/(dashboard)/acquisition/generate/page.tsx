@@ -6,7 +6,7 @@ import { GeneratePanel } from "@/components/acquisition/generate-panel";
 import { AutoRefresh } from "@/components/command/auto-refresh";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Lead Engine" };
+export const metadata: Metadata = { title: "Generate leads" };
 
 export default async function GeneratePage() {
   const session = await auth();
@@ -24,9 +24,9 @@ export default async function GeneratePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Lead Engine</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Generate leads</h1>
           <p className="text-sm text-muted-foreground">
-            Trigger the real pipeline. Progress is tracked from the engine&apos;s own process and logs.
+            Find and research new prospects for your pipeline. You can watch progress here.
           </p>
         </div>
         <AutoRefresh intervalMs={5_000} />

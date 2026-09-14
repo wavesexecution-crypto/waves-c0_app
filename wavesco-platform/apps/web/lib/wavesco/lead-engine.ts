@@ -16,6 +16,13 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import {
+  EngineHttpError,
+  EngineUnavailableError,
+  logEngineError,
+} from "./engine-errors";
+
+export { EngineHttpError, EngineUnavailableError };
 
 const execFileAsync = promisify(execFile);
 
@@ -41,33 +48,53 @@ function apiToken(): string {
 }
 
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${apiUrl()}${path}`, {
-    headers: { authorization: `Bearer ${apiToken()}`, "ngrok-skip-browser-warning": "true" },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`engine API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const base = apiUrl();
+  // Never fetch a relative URL: an empty base would hit the Next app itself
+  // and surface its HTML 404 page as an "engine" error.
+  if (!base) throw new EngineUnavailableError("remote engine URL not configured");
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      headers: { authorization: `Bearer ${apiToken()}`, "ngrok-skip-browser-warning": "true" },
+      cache: "no-store",
+    });
+  } catch (e) {
+    logEngineError(`GET ${path}`, e);
+    throw new EngineUnavailableError();
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    logEngineError(`GET ${path}`, new EngineHttpError(res.status, body.slice(0, 200)));
+    throw new EngineHttpError(res.status, body.slice(0, 200));
+  }
   return (await res.json()) as T;
 }
 
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${apiUrl()}${path}`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiToken()}`,
-      "content-type": "application/json",
-      "ngrok-skip-browser-warning": "true",
-    },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`engine API ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return (await res.json()) as T;
-}
-
-export class EngineUnavailableError extends Error {
-  constructor(public reason: string) {
-    super(reason);
+  const base = apiUrl();
+  if (!base) throw new EngineUnavailableError("remote engine URL not configured");
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiToken()}`,
+        "content-type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch (e) {
+    logEngineError(`POST ${path}`, e);
+    throw new EngineUnavailableError();
   }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    logEngineError(`POST ${path}`, new EngineHttpError(res.status, text.slice(0, 200)));
+    throw new EngineHttpError(res.status, text.slice(0, 200));
+  }
+  return (await res.json()) as T;
 }
 
 /** Non-throwing probe used by callers that need a graceful degraded state. */
@@ -78,7 +105,8 @@ export async function remoteAvailability(): Promise<{ available: boolean; detail
     const healthy = j.ok;
     return { available: healthy, detail: healthy ? "reachable" : "unhealthy" };
   } catch (e) {
-    return { available: false, detail: e instanceof Error ? e.message : "unreachable" };
+    logEngineError("GET /health", e);
+    return { available: false, detail: "unreachable" };
   }
 }
 

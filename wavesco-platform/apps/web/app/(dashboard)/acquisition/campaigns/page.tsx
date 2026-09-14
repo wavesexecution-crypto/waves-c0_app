@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { getFacets, selectCampaignCandidates } from "@/lib/wavesco/lead-engine";
+import { logEngineError, toSafeEngineError } from "@/lib/wavesco/engine-errors";
+import { EngineStatusCard } from "@/components/acquisition/engine-status";
 import { CampaignCreateForm } from "@/components/acquisition/campaign-form";
 import { CampaignSubmitPanel } from "@/components/acquisition/submit-panel";
 import { CampaignControls } from "@/components/acquisition/campaign-controls";
@@ -146,11 +148,12 @@ export default async function CampaignsPage() {
   const tenantId = requireTenantId(session);
 
   let facets: Awaited<ReturnType<typeof getFacets>> | null = null;
-  let engineError: string | null = null;
+  let engineFailure: unknown = null;
   try {
     facets = await getFacets();
   } catch (e) {
-    engineError = e instanceof Error ? e.message : "Lead Engine unreachable";
+    logEngineError("campaigns:facets", e);
+    engineFailure = e;
   }
 
   const campaigns = await loadCampaigns(tenantId);
@@ -189,14 +192,8 @@ export default async function CampaignsPage() {
 
       <section id="new-campaign" className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">New campaign</h2>
-        {engineError || !facets ? (
-          <div className="rounded-lg border border-dashed border-red-500/40 p-4 text-sm">
-            <p className="font-medium">Cannot build segments — Lead Engine unavailable</p>
-            <p className="text-xs text-muted-foreground">{engineError}</p>
-            <a href="/acquisition/campaigns" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
-              Retry
-            </a>
-          </div>
+        {engineFailure || !facets ? (
+          <EngineStatusCard error={toSafeEngineError(engineFailure)} />
         ) : (
           <CampaignCreateForm cities={facets.cities} categories={facets.categories} />
         )}

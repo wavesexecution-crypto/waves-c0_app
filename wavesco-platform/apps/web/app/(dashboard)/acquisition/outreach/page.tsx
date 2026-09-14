@@ -5,11 +5,12 @@ import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { DecideButtons } from "@/components/acquisition/submit-panel";
 import { StatusPill } from "@/components/command/primitives";
+import { outreachStatusLabel } from "@/lib/wavesco/lead-labels";
 import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Cold Email" };
+export const metadata: Metadata = { title: "Outreach" };
 
 const PIPELINE = ["submitted", "approved", "sent", "rejected", "failed"] as const;
 
@@ -86,6 +87,19 @@ export default async function OutreachPage() {
   const failedEmails = emails.filter((e) => String(e.status).toLowerCase() === "failed");
   const failedOrders = orders.filter((o) => String(o.deliveryStatus ?? "").toLowerCase() === "failed" || String(o.sendError ?? "").length > 0);
 
+  // Stuck orders: queued/approved long ago with no provider confirmation.
+  // The scheduler heals these every 15 min; this box makes them visible now.
+  const STUCK_MS = 2 * 60 * 60 * 1000;
+  const nowTs = Date.now();
+  const stuckOrders = orders.filter((o) => {
+    const st = String(o.status ?? "").toUpperCase();
+    if (st !== "PENDING" && st !== "APPROVED") return false;
+    if (String(o.deliveryStatus ?? "") !== "" && String(o.deliveryStatus) !== "pending_reconciliation") return false;
+    const ts = o.submittedAt ?? o.decidedAt ?? o.createdAt;
+    const t = ts ? new Date(ts).getTime() : NaN;
+    return Number.isFinite(t) && nowTs - t > STUCK_MS;
+  });
+
   // Preview example
   const sampleVars = { business: "Acme Corp", city: "Pune", email: "acme@example.com" };
   const sampleTemplate = templates[0] ?? { subject: "Hello {{business}} — quick intro", body: "Hi {{business}} in {{city}},\n\nWe help businesses in {{city}} bring in more customers. Reply to {{email}}?\n\n— WavesCo" };
@@ -95,9 +109,9 @@ export default async function OutreachPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Cold Email</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Outreach</h1>
           <p className="text-sm text-muted-foreground">
-            Pipeline over the existing production path: Approval Queue → Email Outbox → SMTP. Approve or reject here or via Telegram — both reach the same delivery pipeline. Delivery state is tenant-scoped and audit-logged.
+            Every message waits for your approval before it sends. Approve or reject here — approved messages go out automatically.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -111,19 +125,19 @@ export default async function OutreachPage() {
         </div>
       </div>
 
-      {/* Delivery State Inspection */}
+      {/* Outreach status */}
       <section className="rounded-lg border bg-card p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Delivery State — Inspection</h2>
-          <span className="text-xs text-muted-foreground">{emails.length} OutreachEmail · {orders.length} OutreachOrder</span>
+          <h2 className="text-sm font-semibold">Outreach status</h2>
+          <span className="text-xs text-muted-foreground">{emails.length} messages · {orders.length} deliveries</span>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Real statuses: submitted / approved / sent / failed plus <span className="font-mono">sendError</span> / <span className="font-mono">error</span> verbatim. No fake telemetry.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Where every message stands — from your review to delivery.</p>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {PIPELINE.slice(0, 4).map((s) => (
             <div key={`email-${s}`} className="rounded-lg border bg-muted/20 p-3 text-center">
               <StatusPill state={s === "submitted" ? "queued" : s === "sent" ? "connected" : s === "failed" ? "failed" : s} />
               <p className="mt-1.5 text-xl font-semibold tabular-nums">{counts[s as keyof typeof counts] ?? 0}</p>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{s} (email)</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{outreachStatusLabel(s)}</p>
             </div>
           ))}
         </div>
@@ -134,7 +148,7 @@ export default async function OutreachPage() {
               return (
                 <div key={`order-${s}`} className="rounded-lg border border-dashed p-2 text-center">
                   <p className="text-sm font-semibold tabular-nums">{c}</p>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{s} (order deliveryStatus)</p>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{outreachStatusLabel(s)}</p>
                 </div>
               );
             })}
@@ -142,44 +156,60 @@ export default async function OutreachPage() {
         ) : null}
         {(failedEmails.length > 0 || failedOrders.length > 0) ? (
           <div className="mt-3 rounded-md border border-red-500/30 bg-red-500/5 p-3">
-            <p className="text-xs font-medium text-red-600 dark:text-red-400">Failed — inspect sendError</p>
+            <p className="text-xs font-medium text-red-600 dark:text-red-400">Needs attention — these messages couldn&apos;t be sent</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-[11px]">
               {failedEmails.slice(0, 5).map((e) => (
                 <li key={e.id} className="break-words">
-                  <span className="font-medium">{e.business}</span> ({e.email}) — error: {String(e.error ?? (e as any).sendError ?? "unknown").slice(0, 140)}
+                  <span className="font-medium">{e.business}</span> ({e.email}) — sending failed, will retry automatically
                 </li>
               ))}
               {failedOrders.slice(0, 5).map((o) => (
                 <li key={`o-${o.id}`} className="break-words">
-                  <span className="font-medium">{(o as any).businessName ?? o.business}</span> ({o.email}) — sendError: {String(o.sendError ?? "-").slice(0, 140)} deliveryStatus={String(o.deliveryStatus ?? "-")}
+                  <span className="font-medium">{(o as any).businessName ?? o.business}</span> ({o.email}) — {outreachStatusLabel(String(o.deliveryStatus ?? o.status ?? "failed"))}
                 </li>
               ))}
             </ul>
           </div>
         ) : (
-          <p className="mt-3 text-xs text-muted-foreground">No failures to inspect — healthy queue. Timeline per email shows submitted / decided / sent via <code className="rounded bg-muted px-1">formatIST</code>.</p>
+          <p className="mt-3 text-xs text-muted-foreground">No failures — your queue is healthy.</p>
+        )}
+        {stuckOrders.length > 0 && (
+          <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+            <p className="text-xs font-medium text-amber-700">Needs attention — {stuckOrders.length} {stuckOrders.length === 1 ? "message has" : "messages have"} been waiting unusually long</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-[11px]">
+              {stuckOrders.slice(0, 5).map((o) => (
+                <li key={`stuck-${o.id}`} className="break-words">
+                  <span className="font-medium">{(o as any).businessName ?? o.business}</span> ({o.email}) — {outreachStatusLabel(String(o.status))} since{" "}
+                  {o.submittedAt ?? o.decidedAt ?? o.createdAt ? new Date(o.submittedAt ?? o.decidedAt ?? o.createdAt).toLocaleString() : "unknown"}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              These retry automatically. To force it now: Pipeline → Sync delivery &amp; replies.
+            </p>
+          </div>
         )}
       </section>
 
-      {/* Templates Management */}
+      {/* Templates */}
       <section className="rounded-lg border bg-card p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Templates — Manage</h2>
+          <h2 className="text-sm font-semibold">Message templates</h2>
           <div className="flex items-center gap-2">
             <StatusPill state={templatesStatus === "ok" ? "connected" : "disconnected"} />
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">{templatesStatus} · {templates.length} templates</span>
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">{templates.length} templates</span>
             <Link href="/acquisition/email" className="rounded-md border px-2.5 py-1 text-xs hover:bg-accent">
-              Manage in Email Control
+              Manage templates
             </Link>
           </div>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Tenant-scoped via <code className="rounded bg-muted px-1">withTenantContext</code> + RLS. CRUD via <code className="rounded bg-muted px-1">POST /api/acquisition/email/templates</code> with <code className="rounded bg-muted px-1">auditControl(action=email.template.*)</code>. Preview renders without sending.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Reusable messages with {"{{business}}"} and {"{{city}}"} personalization. Preview renders without sending.</p>
         {templates.length === 0 ? (
           <div className="mt-3 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-            No templates yet — create one in Email Control. Supports <code className="rounded bg-muted px-1">{"{{business}}"}</code> <code className="rounded bg-muted px-1">{"{{city}}"}</code> vars. API returns <span className="font-mono">not_configured</span> when EmailTemplate table missing, with empty array (never 500).
+            No templates yet — create one to speed up your outreach.
             <div className="mt-2">
               <Link href="/acquisition/email" className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
-                Create First Template
+                Create your first template
               </Link>
             </div>
           </div>
@@ -209,8 +239,8 @@ export default async function OutreachPage() {
 
       {/* Preview */}
       <section className="rounded-lg border bg-card p-4">
-        <h2 className="text-sm font-semibold">Preview — Render without sending</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Preview calls <code className="rounded bg-muted px-1">POST /api/acquisition/email/templates</code> with <span className="font-mono">{"{ action: \"preview\", template: { subject, body }, vars: { business, city } }"}</span> — pure server-side render, audit-logged as <span className="font-mono">email.template.preview</span>, never hits Brevo/SMTP.</p>
+        <h2 className="text-sm font-semibold">Preview before you send</h2>
+        <p className="mt-1 text-xs text-muted-foreground">See exactly what a prospect receives — previews never send anything.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="rounded-md border bg-muted/20 p-3">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Template (raw)</p>
@@ -232,7 +262,11 @@ export default async function OutreachPage() {
 
       {emails.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No cold email activity yet. Queue a campaign under Campaigns; statuses will track real submission, approval and dispatch events.
+          <p className="font-medium text-foreground">No outreach yet</p>
+          <p className="mt-1">Build a campaign and approve your first messages to start conversations.</p>
+          <Link href="/acquisition/campaigns" className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+            Go to campaigns
+          </Link>
         </div>
       ) : (
         <>
@@ -241,7 +275,7 @@ export default async function OutreachPage() {
               <div key={s} className="rounded-lg border bg-card p-3 text-center">
                 <StatusPill state={s === "submitted" ? "queued" : s} />
                 <p className="mt-1.5 text-xl font-semibold tabular-nums">{counts[s]}</p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{s}</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{outreachStatusLabel(s)}</p>
               </div>
             ))}
           </div>
@@ -269,10 +303,10 @@ export default async function OutreachPage() {
                     <td className="max-w-[220px] truncate px-4 py-2.5 text-xs">{e.subject}</td>
                     <td className="px-4 py-2.5">
                       <StatusPill state={e.status} />
-                      {e.error ? <span className="mt-1 block max-w-[200px] break-words text-[11px] text-red-500">{e.error}</span> : null}
-                      {(e as any).sendError ? <span className="mt-1 block max-w-[200px] break-words text-[11px] text-red-500">sendError: {String((e as any).sendError).slice(0, 120)}</span> : null}
+                      <span className="mt-1 block text-[11px] text-muted-foreground">{outreachStatusLabel(String(e.status))}</span>
+                      {e.error || (e as any).sendError ? <span className="mt-1 block max-w-[200px] break-words text-[11px] text-red-500">Sending failed — retrying automatically</span> : null}
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{e.approvalId ?? "-"}</td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{e.decidedAt ? "Reviewed" : "Waiting for review"}</td>
                     <td className="px-4 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
                       submitted {formatIST(e.submittedAt)}
                       <br />
@@ -294,7 +328,7 @@ export default async function OutreachPage() {
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            Note: &quot;approved&quot; means the decision reached the existing decide endpoint; &quot;sent&quot; is set only when that response confirms dispatch through Email Outbox. Delivery/bounce/reply telemetry does not exist upstream yet and is therefore never shown here — see Email Control for deliveryState + sendError when OutreachOrder is present.
+            Approved means you reviewed it. Sent means it left your outbox.
           </p>
         </>
       )}

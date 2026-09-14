@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { getFacets } from "@/lib/wavesco/lead-engine";
+import { logEngineError, toSafeEngineError } from "@/lib/wavesco/engine-errors";
+import { EngineStatusCard } from "@/components/acquisition/engine-status";
 import { classifyEmail, type EmailStatus } from "@/lib/wavesco/outreach-logic";
 import { listPipelineLeads } from "@/lib/wavesco/pipeline";
 import { MetricCard, SectionHeader, StatusPill } from "@/components/command/primitives";
@@ -29,6 +31,7 @@ interface OrderRow {
   version: number;
   status: string;
   subject: string;
+  plannerModel: string | null;
   deliveryStatus: string | null;
   replyStatus: string | null;
   approvalId: string | null;
@@ -42,14 +45,15 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
   const tenantId = requireTenantId(session);
   const sp = await searchParams;
 
-  let corpusError: string | null = null;
+  let engineFailure: unknown = null;
   let leads: Awaited<ReturnType<typeof listPipelineLeads>> = [];
   let facets: Awaited<ReturnType<typeof getFacets>> | null = null;
   try {
     leads = listPipelineLeads();
     facets = await getFacets();
   } catch (e) {
-    corpusError = e instanceof Error ? e.message : "Lead Engine unreachable";
+    logEngineError("pipeline:facets", e);
+    engineFailure = e;
   }
 
   const researches = new Map<
@@ -59,7 +63,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
   const ordersByLead = new Map<string, OrderRow>();
   let followUpDue = 0;
 
-  if (!corpusError) {
+  if (!engineFailure) {
     await withTenantContext(tenantId, async (tx) => {
       for (const r of await tx.leadResearch.findMany({
         where: { tenantId },
@@ -77,6 +81,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
             version: o.version,
             status: o.status,
             subject: o.subject,
+            plannerModel: (o as { plannerModel?: string | null }).plannerModel ?? null,
             deliveryStatus: o.deliveryStatus,
             replyStatus: o.replyStatus,
             approvalId: o.approvalId,
@@ -223,14 +228,8 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
         <AutoRefresh intervalMs={10_000} />
       </div>
 
-      {corpusError ? (
-        <div className="rounded-lg border border-dashed border-red-500/40 p-6 text-sm">
-          <p className="font-medium">Lead Engine unavailable</p>
-          <p className="text-muted-foreground">{corpusError}</p>
-          <a href="/acquisition/pipeline" className="mt-3 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
-            Retry
-          </a>
-        </div>
+      {engineFailure ? (
+        <EngineStatusCard error={toSafeEngineError(engineFailure)} />
       ) : (
         <>
           {/* Metrics */}
@@ -356,6 +355,21 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
                           <>
                             <StatusPill state={r.order.status.toLowerCase()} />
                             <span className="mt-1 block max-w-[200px] truncate text-[10px] text-muted-foreground">{r.order.subject}</span>
+                            {r.order.plannerModel === "fact-composer" ? (
+                              <span
+                                title="AI enrichment was unavailable when this was drafted, so a deterministic template was used. The copy is safe but generic — review before approving."
+                                className="mt-1 inline-block rounded-sm border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-700"
+                              >
+                                Drafted without AI
+                              </span>
+                            ) : r.order.plannerModel ? (
+                              <span
+                                title={`Drafted with AI model ${r.order.plannerModel}. Still review before approving.`}
+                                className="mt-1 inline-block max-w-[200px] truncate rounded-sm border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground"
+                              >
+                                AI · {r.order.plannerModel}
+                              </span>
+                            ) : null}
                           </>
                         ) : (
                           <span className="text-[11px] text-muted-foreground">—</span>

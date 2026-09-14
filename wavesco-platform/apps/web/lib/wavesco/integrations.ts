@@ -9,6 +9,7 @@ import {
   listBatchManifests,
   remoteAvailability,
 } from "./lead-engine";
+import { logEngineError } from "./engine-errors";
 
 /**
  * Computes REAL integration status by probing the underlying systems.
@@ -364,7 +365,8 @@ async function computeRaw(tenantId: string): Promise<Omit<IntegrationStatusView,
         key: "n8n",
         label: "n8n",
         state: health.reason === "network" ? "disconnected" : "error",
-        detail: health.error ?? "healthz unreachable",
+        // Never surface raw fetch errors (they contain hosts/ports).
+        detail: "Automation service is unreachable. Sending is paused.",
       });
     } else {
       out.push({
@@ -389,7 +391,10 @@ async function computeRaw(tenantId: string): Promise<Omit<IntegrationStatusView,
         hasEngineToken = false;
       }
     }
-    const manifests = await listBatchManifests();
+    const manifests = await listBatchManifests().catch((e: unknown) => {
+      logEngineError("integrations:manifests", e);
+      return [];
+    });
     const delivered = manifests.find((m) => (m.telegramDeliveryStatus ?? "").includes("delivered"));
     if (hasPlatformToken || hasEngineToken) {
       const deliveryStatus = delivered?.telegramDeliveryStatus ?? "";
