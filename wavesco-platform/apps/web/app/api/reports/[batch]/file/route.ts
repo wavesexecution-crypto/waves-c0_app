@@ -72,7 +72,8 @@ export async function GET(request: Request, ctx: RouteContext) {
   if (leadEngineMode() === "remote") {
     const file = await fetchManifestFile(batch, type);
     if (!file.ok) {
-      return NextResponse.json({ error: file.error }, { status: 404 });
+      console.error(`[reports:file] engine fetch failed: ${file.error}`);
+      return NextResponse.json({ error: "That file isn't available right now." }, { status: 404 });
     }
     return new NextResponse(new Uint8Array(file.body), {
       headers: {

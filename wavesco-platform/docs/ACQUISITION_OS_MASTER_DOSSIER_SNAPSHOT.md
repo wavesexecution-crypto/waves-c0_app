@@ -829,7 +829,7 @@ All outputs tenant-scoped and downloadable only after `requireControlAuth`; PDFs
 
 - **Database:** Neon Postgres, `DATABASE_URL` pooled (`wavesco_app`, `pgbouncer=true`) + `DIRECT_URL` migration (`wavesco`) — RLS enforced. Local `docker compose up -d` PostgreSQL 16 on `:5433`.
 
-- **Lead Engine:** local `D:\wavesco-lead-engine` (standalone, not git, `data/leads.db`, `data/runs/*.json`, `reports/`, `exports/`, `config.json`, `.venv/Scripts/python.exe`, `serve.py` for remote HTTP). Tunnel/ngrok (`ngrok-skip-browser-warning` header) expected when `LEAD_ENGINE_API_URL` is ngrok.
+- **Lead Engine:** local `D:\wavesco-lead-engine` (standalone, not git, `data/leads.db`, `data/runs/*.json`, `reports/`, `exports/`, `config.json`, `.venv/Scripts/python.exe`, `serve.py` for remote HTTP). Tunnel via Cloudflare (`engine.wavesco.in` named tunnel `acquisition-lead-engine`) expected when `LEAD_ENGINE_API_URL` is remote.
 
 - **n8n:** dev `http://localhost:5678` bridge `http://localhost:5678/webhook/personal/wavesco-leads` (`config.json:notify`), `http://localhost:5678/webhook/personal/approval`, prod `N8N_BASE_URL` (BLOCKED prod until set).
 
@@ -915,7 +915,7 @@ All outputs tenant-scoped and downloadable only after `requireControlAuth`; PDFs
 
 - **Polling load:** `AutoRefresh 15_000` (leads/campaigns/workflows/agents) + `30_000` (overview/analytics/system) via `router.refresh()` with `cache: no-store`; no websocket.
 
-- **Lead Engine I/O:** local `openReadonly → prepare → all → close` per request (no pool); remote `fetch + Bearer + ngrok-skip-browser-warning`.
+- **Lead Engine I/O:** local `openReadonly → prepare → all → close` per request (no pool); remote `fetch + Bearer` through the Cloudflare Tunnel.
 
 - **AI Gateway:** provider latency `latencyMs` logged per call; Analytics avgLatency typical 300–1500ms depending on gemma4:31b.
 
@@ -960,7 +960,7 @@ All BLOCKED states surfaced explicitly in UI (`StatusPill error/disconnected`) +
 | 5 | `reference_md` empty in `config.json` → no grounded prompt doc for `enrich_ai.py` | Low | AI | Open |
 | 6 | Multi-role RBAC not implemented (`User.role = owner` only) | Low | Platform | Open — future |
 | 7 | `wavesco-lead-engine` not git-versioned → drift risk vs platform `withTenantContext` | Medium | Eng | Mitigated by dual-mode contract & `wavesco_env_path` pin |
-| 8 | `LEAD_ENGINE_API_URL` uses tunnel/ngrok — transient unreachable degrades overview → add retry badge | Low | Infra | Enhancement |
+| 8 | `LEAD_ENGINE_API_URL` uses the Cloudflare Tunnel (`engine.wavesco.in`, stable, auto-reconnects) — transient unreachable degrades overview → add retry badge | Low | Infra | Enhancement |
 | 9 | Deleted cafe-* module scaffolds (`cafe-crm` etc.) contain no contract → decide keep vs remove | Low | Product | Open |
 
 ## 42 — Future Roadmap

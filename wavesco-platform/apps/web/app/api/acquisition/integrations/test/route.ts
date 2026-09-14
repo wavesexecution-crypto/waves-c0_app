@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auditControl, requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, auditControl, requireControlAuth } from "@/lib/wavesco/control";
 import { maskUrl } from "@/lib/wavesco/integrations";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,8 @@ export async function POST(req: Request) {
   let userId: string | null | undefined;
   try {
     const auth = await requireControlAuth();
+    const denied = await acquisitionDenied(auth.tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     tenantId = auth.tenantId;
     userId = auth.userId;
   } catch (e) {
@@ -215,7 +217,6 @@ export async function POST(req: Request) {
         const res = await fetch(`${apiUrl}/health`, {
           headers: {
             ...(token ? { authorization: `Bearer ${token}` } : {}),
-            "ngrok-skip-browser-warning": "true",
           } as Record<string, string>,
           cache: "no-store",
           signal: AbortSignal.timeout(8000),
@@ -227,16 +228,16 @@ export async function POST(req: Request) {
             { status: 200 }
           );
         }
-        const txt = await res.text().catch(() => "");
+        await res.text().catch(() => "");
         return NextResponse.json(
-          { key: responseKey, status: "error" as const, detail: `Lead Engine ${res.status}: ${txt.slice(0, 200)}`, reason: `Lead Engine ${res.status}`, latencyMs, lastCheckedAt, url: masked },
+          { key: responseKey, status: "error" as const, detail: `Lead Engine ${res.status}: temporarily unavailable`, reason: `Lead Engine ${res.status}`, latencyMs, lastCheckedAt, url: masked },
           { status: 200 }
         );
       } catch (e) {
         const latencyMs = Date.now() - start;
-        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[integrations:test:lead_engine] ${e instanceof Error ? e.message : String(e)}`);
         return NextResponse.json(
-          { key: responseKey, status: "error" as const, detail: `Lead Engine unreachable: ${msg.slice(0, 200)}`, reason: msg.slice(0, 200), latencyMs, lastCheckedAt, url: masked },
+          { key: responseKey, status: "error" as const, detail: "Lead Engine unreachable: temporarily unavailable", reason: "unreachable", latencyMs, lastCheckedAt, url: masked },
           { status: 200 }
         );
       }

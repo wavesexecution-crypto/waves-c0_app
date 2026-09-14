@@ -41,8 +41,12 @@ function apiToken(): string {
 }
 
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${apiUrl()}${path}`, {
-    headers: { authorization: `Bearer ${apiToken()}`, "ngrok-skip-browser-warning": "true" },
+  const base = apiUrl();
+  // Never fetch a relative URL: an empty base would hit this Next app itself
+  // and surface its HTML 404 page as an engine error.
+  if (!base) throw new EngineUnavailableError("remote engine URL not configured");
+  const res = await fetch(`${base}${path}`, {
+    headers: { authorization: `Bearer ${apiToken()}` },
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`engine API ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -50,12 +54,13 @@ async function apiGet<T>(path: string): Promise<T> {
 }
 
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${apiUrl()}${path}`, {
+  const base = apiUrl();
+  if (!base) throw new EngineUnavailableError("remote engine URL not configured");
+  const res = await fetch(`${base}${path}`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${apiToken()}`,
       "content-type": "application/json",
-      "ngrok-skip-browser-warning": "true",
     },
     body: JSON.stringify(body),
     cache: "no-store",

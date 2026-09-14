@@ -8,7 +8,7 @@
 - DB: `docker compose up -d` (Postgres 16 on `:5433`, RLS `wavesco_app`)
 - Migrate: `pnpm --filter @wavesco/db db:migrate` (uses `DIRECT_URL` migration role `wavesco`)
 - Lead Engine (local): `D:\wavesco-lead-engine` with `data/leads.db` present (default `LEAD_ENGINE_ROOT=D:\wavesco-lead-engine`; keep `LEAD_ENGINE_MODE=local`)
-- Lead Engine (remote, prod): `LEAD_ENGINE_MODE=remote`, `LEAD_ENGINE_API_URL` (serve.py host, supports ngrok) + `LEAD_ENGINE_API_TOKEN` Bearer (`fetch` header `ngrok-skip-browser-warning`)
+- Lead Engine (remote, prod): `LEAD_ENGINE_MODE=remote`, `LEAD_ENGINE_API_URL` (production: `https://engine.wavesco.in` via the `acquisition-lead-engine` Cloudflare Tunnel) + `LEAD_ENGINE_API_TOKEN` Bearer
 - n8n (optional locally): run at `http://localhost:5678`, set `N8N_BASE_URL` + `N8N_API_KEY` (Create in n8n Settings → n8n API)
 - AI Gateway: set `OPENAI_API_KEY` + `OPENAI_BASE_URL=https://ollama.com/v1` + `OPENAI_MODEL=gemma4:31b` (Ollama Cloud) or tenant `ClientAiConfig` with `credentialRef=env:OPENAI_API_KEY`
 

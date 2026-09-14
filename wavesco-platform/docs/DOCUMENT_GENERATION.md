@@ -30,7 +30,7 @@ Lineage: `GenerationBatch.engineBatchId` ↔ `ActivityEvent.sourceKey` ↔ `Lead
 ## Remote vs local
 
 - Local: reads `data/runs/*.json` manifests + `reports/` directly.
-- Remote: `GET /manifests` + `GET /manifests/{id}/file?type=` Bearer `LEAD_ENGINE_API_TOKEN` (header `ngrok-skip-browser-warning`). Missing `LEAD_ENGINE_API_URL` → `BLOCKED` in integrations/health, Docs shows empty state not 500.
+- Remote: `GET /manifests` + `GET /manifests/{id}/file?type=` Bearer `LEAD_ENGINE_API_TOKEN` (no tunnel-specific headers — Cloudflare Tunnel needs none). Missing `LEAD_ENGINE_API_URL` → `BLOCKED` in integrations/health, Docs shows empty state not 500.
 
 ## Operate
 
