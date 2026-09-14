@@ -55,7 +55,7 @@ async function apiGet<T>(path: string): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${base}${path}`, {
-      headers: { authorization: `Bearer ${apiToken()}`, "ngrok-skip-browser-warning": "true" },
+      headers: { authorization: `Bearer ${apiToken()}` },
       cache: "no-store",
     });
   } catch (e) {
@@ -80,7 +80,6 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
       headers: {
         authorization: `Bearer ${apiToken()}`,
         "content-type": "application/json",
-        "ngrok-skip-browser-warning": "true",
       },
       body: JSON.stringify(body),
       cache: "no-store",
