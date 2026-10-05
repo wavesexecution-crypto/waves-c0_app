@@ -34,8 +34,13 @@ export default async function AcquisitionProfilePage() {
   }
 
   const readiness = readinessCheck(profile);
-  const doneCount = STEP_GROUPS.filter(
-    (g) => (g.optional ?? false) || (g.keys.length > 0 && g.keys.every((k) => Boolean(readiness.snapshot[k]))),
+  // Optional sections were counted as complete unconditionally, so a brand-new
+  // profile advertised "3 of 8 sections complete" with green ticks on three
+  // sections the user never touched. They are now shown as optional until
+  // populated, and only required sections count toward progress.
+  const requiredGroups = STEP_GROUPS.filter((g) => !(g.optional ?? false));
+  const doneCount = requiredGroups.filter(
+    (g) => g.keys.length > 0 && g.keys.every((k) => Boolean(readiness.snapshot[k])),
   ).length;
 
   return (
@@ -52,23 +57,39 @@ export default async function AcquisitionProfilePage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Onboarding · {doneCount} of {STEP_GROUPS.length} sections complete · Status {profile?.status ?? "DRAFT"}
+                Onboarding · {doneCount} of {requiredGroups.length - 1} required sections complete · Status{" "}
+                {profile?.status ?? "DRAFT"}
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {STEP_GROUPS.map((g) => {
-                  const done = (g.optional ?? false) || (g.keys.length > 0 && g.keys.every((k) => Boolean(readiness.snapshot[k])));
+                  const filled = g.keys.length > 0 && g.keys.every((k) => Boolean(readiness.snapshot[k]));
                   const isReview = g.keys.length === 0 && !g.optional;
+                  // Optional sections read "optional" until they have content;
+                  // they never present as done work the client did not do.
+                  const showDone = filled || (isReview && readiness.ready);
                   return (
                     <span
                       key={g.label}
-                      title={g.optional ? "Optional — improves results, never blocks activation" : isReview ? "Activate when all required sections are done" : undefined}
+                      title={
+                        g.optional
+                          ? filled
+                            ? "Optional section filled in"
+                            : "Optional — improves results, never blocks activation"
+                          : isReview
+                            ? "Activate when all required sections are done"
+                            : undefined
+                      }
                       className={`rounded-full border px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.08em] ${
-                        done || (isReview && readiness.ready)
+                        showDone
                           ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                          : "border-border/80 text-muted-foreground"
+                          : g.optional
+                            ? "border-dashed border-border/80 text-muted-foreground/70"
+                            : "border-border/80 text-muted-foreground"
                       }`}
                     >
-                      {done || (isReview && readiness.ready) ? "✓ " : ""}{g.label}
+                      {showDone ? "✓ " : ""}
+                      {g.label}
+                      {g.optional && !filled ? " (optional)" : ""}
                     </span>
                   );
                 })}

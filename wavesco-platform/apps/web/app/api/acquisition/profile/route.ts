@@ -65,8 +65,13 @@ export async function GET() {
     return NextResponse.json({ profile, readiness, exists: true });
   } catch (e) {
     if (isUnauthorized(e)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: "internal", detail: msg }, { status: 500 });
+    // Never ship the driver message: it carries SQL/RLS text the client cannot
+    // act on. Full detail goes to the server log.
+    console.error("[api:acquisition/profile] request failed", e);
+    return NextResponse.json(
+      { error: "We could not load your profile just now. Please try again." },
+      { status: 500 }
+    );
   }
 }
 
@@ -151,8 +156,13 @@ export async function POST(req: Request) {
     return NextResponse.json(result, { status: 200 });
   } catch (e) {
     if (isUnauthorized(e)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: "internal", detail: msg }, { status: 500 });
+    // Never ship the driver message: it carries SQL/RLS text the client cannot
+    // act on. Full detail goes to the server log.
+    console.error("[api:acquisition/profile] save failed", e);
+    return NextResponse.json(
+      { error: "We could not save your profile. Nothing was changed — please try again." },
+      { status: 500 }
+    );
   }
 }
 
