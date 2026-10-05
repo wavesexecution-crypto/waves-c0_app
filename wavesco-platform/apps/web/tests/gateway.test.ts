@@ -13,6 +13,9 @@ vi.mock("@wavesco/db", () => ({
     clientAiConfig: { findFirst: vi.fn() },
     aiUsageLog: { create: vi.fn() },
   },
+  directPrisma: () => ({
+    tenant: { findFirst: vi.fn(async () => ({ id: "tenant_test", slug: "test-tenant" })) },
+  }),
   withTenantContext: vi.fn((_tenantId: string, fn: (tx: unknown) => Promise<unknown>) =>
     fn({ clientAiConfig: { findFirst: vi.fn() }, aiUsageLog: { create: vi.fn() } })
   ),

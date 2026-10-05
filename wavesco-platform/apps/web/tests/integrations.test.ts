@@ -23,6 +23,7 @@ vi.mock("@/lib/wavesco/lead-engine", () => ({
 }));
 
 vi.mock("@/lib/wavesco/control", () => ({
+  acquisitionDenied: vi.fn(async () => null),
   requireControlAuth: vi.fn(async () => {
     throw new Error("UNAUTHORIZED");
   }),

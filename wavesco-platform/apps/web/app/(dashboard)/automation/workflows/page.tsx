@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { auth } from "@/lib/auth";
+import { requireInternalAccess, requireTenantId } from "@/lib/tenant";
 import { StatusPill } from "@/components/command/primitives";
 import {
   getHealth,
@@ -13,7 +15,13 @@ import { formatIST } from "@/lib/wavesco/time";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Workflows" };
 
-export default function WorkflowsPage() {
+export default async function WorkflowsPage() {
+  const session = await auth();
+  requireTenantId(session);
+  // Exposes workflow names, Task Scheduler state and an operator runbook.
+  // Operator-only.
+  requireInternalAccess(session);
+
   return (
     <div className="space-y-6">
       <div>

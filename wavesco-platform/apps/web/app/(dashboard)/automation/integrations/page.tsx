@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { existsSync } from "node:fs";
 import { auth } from "@/lib/auth";
-import { requireTenantId } from "@/lib/tenant";
+import { requireInternalAccess, requireTenantId } from "@/lib/tenant";
 import { n8nApiKey, n8nBaseUrl } from "@/lib/wavesco/n8n";
 import { leadEngineRoot, pythonExe } from "@/lib/wavesco/lead-engine";
 
@@ -22,6 +22,9 @@ function VarRow({ name, present }: { name: string; present: boolean }) {
 export default async function IntegrationsPage() {
   const session = await auth();
   requireTenantId(session);
+  // Shows which environment variables are set and where the engine lives on
+  // disk. Operator-only.
+  requireInternalAccess(session);
 
   const engineRoot = leadEngineRoot();
   const checks = [

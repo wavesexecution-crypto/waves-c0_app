@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { auditControl, requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, auditControl, requireControlAuth, sessionRole } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 import { onCampaignResultsFinalized } from "@/lib/wavesco/notify";
+import { can } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,20 @@ type Action = (typeof VALID_ACTIONS)[number];
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const { tenantId, userId } = await requireControlAuth();
+    const { tenantId, userId, session } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
+
+    // Launching and stopping a campaign sends real email. The equivalent server
+    // action already refuses non-admins; this route must not be the bypass.
+    // The role comes from the session requireControlAuth already resolved.
+    if (!can({ role: sessionRole(session) }, "admin", "acquisition")) {
+      return NextResponse.json(
+        { error: "Your role cannot change campaign status. Ask a workspace owner or admin." },
+        { status: 403 }
+      );
+    }
+
     const { id } = await ctx.params;
 
     let body: Record<string, unknown> = {};
@@ -95,6 +109,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     if (isUnauthorized) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({ error: "internal", detail: msg }, { status: 500 });
+    // Never ship the raw driver message to the browser; log it server-side.
+    console.error("[campaigns:control] unhandled error", e);
+    return NextResponse.json(
+      { error: "We could not change the campaign status. Try again in a moment." },
+      { status: 500 }
+    );
   }
 }

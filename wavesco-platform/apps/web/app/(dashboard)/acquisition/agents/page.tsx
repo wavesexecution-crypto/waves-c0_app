@@ -6,6 +6,7 @@ import { maskUrl } from "@/lib/wavesco/integrations";
 import { StatusPill } from "@/components/command/primitives";
 import { AutoRefresh } from "@/components/command/auto-refresh";
 import { AgentToggle, AgentConfigureForm } from "@/components/acquisition/agent-controls";
+import { safeErrorText } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Agents — AI Gateway" };
@@ -55,7 +56,7 @@ export default async function AgentsPage() {
     config = result.config as any;
     usage = (result.usage as any) ?? [];
   } catch (e) {
-    loadError = e instanceof Error ? e.message : String(e);
+    loadError = safeErrorText(e, "AI configuration is temporarily unavailable.", "agents:load");
   }
 
   const isConfigured = !!config;
@@ -80,17 +81,18 @@ export default async function AgentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Agents — Waves AI Gateway</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Automation</p>
+          <h1 className="mt-1 font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Agents — Waves AI Gateway</h1>
+          <p className="mt-1.5 max-w-2xl font-sans text-[13px] leading-5 text-muted-foreground">
             Per-tenant AI Gateway control. Gateway credentials are credentialRef (env:VAR) server-side only, never exposed to the browser. Base URL is masked.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={15_000} />
           <StatusPill state={gatewayPill} />
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">
+          <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             {gatewayStatus === "ok" ? "LIVE" : gatewayStatus === "disabled" ? "DISABLED" : gatewayStatus === "not_configured" ? "NOT CONFIGURED" : "ERROR"}
           </span>
         </div>
@@ -99,8 +101,8 @@ export default async function AgentsPage() {
       {loadError ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 text-sm">
           <p className="font-medium text-red-600 dark:text-red-400">Failed to load gateway state</p>
-          <p className="text-xs text-muted-foreground">{loadError}</p>
-          <a href="/acquisition/agents" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">{loadError}</p>
+          <a href="/acquisition/agents" className="mt-2 inline-block rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
             Retry
           </a>
         </div>
@@ -112,7 +114,7 @@ export default async function AgentsPage() {
           <p className="mt-1 text-xs text-muted-foreground">
             No ClientAiConfig for this tenant. Enable will create a default config (provider ollama_cloud). Configure saves provider/model/baseUrl (audited, credentialRef never leaves server).
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Gateway: not_configured · tenant {tenantId} · Limits: rate/token — provider-enforced, see activity below.</p>
+          <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Gateway: not_configured · tenant {tenantId} · Limits: rate/token — provider-enforced, see activity below.</p>
         </div>
       ) : !isEnabled ? (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
@@ -120,61 +122,61 @@ export default async function AgentsPage() {
           <p className="mt-1 text-xs text-muted-foreground">
             aiEnabled=false. All gateway calls are blocked with 403 ai_disabled. Enable to resume enrichment/email AI operations. No fake success is shown — status reflects ClientAiConfig.
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Gateway: disabled · provider {provider} · model {model} · baseUrl {String(maskedBaseUrl)} · credential: masked (server-side credentialRef)</p>
+          <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Gateway: disabled · provider {provider} · model {model} · baseUrl {String(maskedBaseUrl)} · credential: masked (server-side credentialRef)</p>
         </div>
       ) : null}
 
       {/* Agent list / config card */}
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-4 py-3">
-          <h2 className="text-sm font-semibold">Agent config (ClientAiConfig)</h2>
-          <p className="text-xs text-muted-foreground">One row per tenant. Enable/disable toggles aiEnabled and is audit-logged. Configure updates provider/model/baseUrl.</p>
+      <div className="rounded-lg border border-border/80 bg-card">
+        <div className="border-b border-border/60 px-4 py-3">
+          <h2 className="font-sans text-[13px] font-semibold tracking-[-0.01em] text-foreground">Agent config (ClientAiConfig)</h2>
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">One row per tenant. Enable/disable toggles aiEnabled and is audit-logged. Configure updates provider/model/baseUrl.</p>
         </div>
         {isConfigured && config ? (
           <div className="space-y-3 p-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tenant</p>
+              <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+                <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Tenant</p>
                 <p className="mt-1 font-mono text-xs">{config.tenantId}</p>
-                <p className="text-[11px] text-muted-foreground">id {config.id}</p>
+                <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">id {config.id}</p>
               </div>
-              <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Enabled</p>
+              <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+                <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Enabled</p>
                 <p className="mt-1 flex items-center gap-2">
                   <StatusPill state={isEnabled ? "connected" : "disconnected"} />
                   <span className="text-xs font-medium">{isEnabled ? "enabled" : "disabled"}</span>
                 </p>
-                <p className="text-[11px] text-muted-foreground">gateway {gatewayStatus}</p>
+                <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">gateway {gatewayStatus}</p>
               </div>
-              <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Provider / Model</p>
+              <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+                <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Provider / Model</p>
                 <p className="mt-1 text-xs font-medium">{provider} · {model}</p>
-                <p className="text-[11px] text-muted-foreground">baseUrl {String(maskedBaseUrl)}</p>
+                <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">baseUrl {String(maskedBaseUrl)}</p>
               </div>
-              <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Credential</p>
+              <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+                <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Credential</p>
                 <p className="mt-1 font-mono text-xs">*** (credentialRef masked)</p>
-                <p className="text-[11px] text-muted-foreground">Resolved server-side via env:VAR; never leaked</p>
+                <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Resolved server-side via env:VAR; never leaked</p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-muted/30 p-3">
               <AgentToggle aiEnabled={isEnabled} hasConfig={true} />
-              <span className="ml-auto text-[11px] text-muted-foreground">Audit: agent.enable / agent.disable → AuditLog (ClientAiConfig, tenant {tenantId})</span>
+              <span className="ml-auto font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Audit: agent.enable / agent.disable → AuditLog (ClientAiConfig, tenant {tenantId})</span>
             </div>
 
             <AgentConfigureForm initial={{ provider: config.provider ?? "ollama_cloud", model: config.model ?? "gemma3:27b", baseUrl: maskedBaseUrl }} />
 
-            <p className="text-[11px] text-muted-foreground">
+            <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
               Config updatedAt {config.updatedAt ? String(new Date(config.updatedAt as any).toLocaleString()) : "—"} · obsidianRoot {String((config as any).obsidianRoot ?? "—")} · If gateway unreachable during configure, response status=error but audit still written.
             </p>
           </div>
         ) : (
           <div className="space-y-3 p-4">
-            <p className="text-sm text-muted-foreground">No config yet. Use Enable to create a default, or Configure to create with custom provider/model/baseUrl.</p>
-            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3">
+            <p className="mt-1.5 max-w-2xl font-sans text-[13px] leading-5 text-muted-foreground">No config yet. Use Enable to create a default, or Configure to create with custom provider/model/baseUrl.</p>
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-muted/30 p-3">
               <AgentToggle aiEnabled={false} hasConfig={false} />
-              <span className="ml-auto text-[11px] text-muted-foreground">Will create ClientAiConfig on first enable/configure (audited).</span>
+              <span className="ml-auto font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Will create ClientAiConfig on first enable/configure (audited).</span>
             </div>
             <AgentConfigureForm initial={{ provider: "ollama_cloud", model: "gemma3:27b", baseUrl: "" }} />
           </div>
@@ -184,16 +186,16 @@ export default async function AgentsPage() {
       {/* Activity — AiUsageLog last 20 */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Activity — AiUsageLog (last 20)</h2>
-          <span className="text-xs text-muted-foreground">
+          <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Activity — AiUsageLog (last 20)</h2>
+          <span className="font-sans text-[13px] leading-5 text-muted-foreground">
             {usage.length} entries · total input {totalInputTokens} · output {totalOutputTokens} · avg latency {avgLatency != null ? `${avgLatency}ms` : "—"}
           </span>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr className="border-b border-border/60 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 <th className="px-3 py-2">When</th>
                 <th className="px-3 py-2">Operation</th>
                 <th className="px-3 py-2">Provider / Model</th>
@@ -212,7 +214,7 @@ export default async function AgentsPage() {
                 </tr>
               ) : (
                 usage.map((u) => (
-                  <tr key={u.id} className="border-b last:border-0 hover:bg-accent/40">
+                  <tr key={u.id} className="border-b border-border/60 last:border-0 hover:bg-card-hover">
                     <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(u.createdAt).toLocaleString()}</td>
                     <td className="px-3 py-2 text-xs font-mono">{u.operation}</td>
                     <td className="px-3 py-2 text-xs">{u.provider} · {u.model}</td>
@@ -236,8 +238,8 @@ export default async function AgentsPage() {
 
         {/* Tool usage & failures & limits summary */}
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border bg-card p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tool usage (by operation)</p>
+          <div className="rounded-lg border border-border/80 bg-card p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Tool usage (by operation)</p>
             {Object.keys(toolUsage).length === 0 ? (
               <p className="mt-1 text-xs text-muted-foreground">No operations logged.</p>
             ) : (
@@ -252,24 +254,24 @@ export default async function AgentsPage() {
             )}
           </div>
 
-          <div className="rounded-lg border bg-card p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Failures (status=error)</p>
+          <div className="rounded-lg border border-border/80 bg-card p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Failures (status=error)</p>
             {failures.length === 0 ? (
               <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">No failures in last 20 — clean.</p>
             ) : (
               <div className="mt-2 space-y-2">
                 <p className="text-xs">
                   <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">{failures.length} failed</span>
-                  <span className="ml-2 text-[11px] text-muted-foreground">most recent:</span>
+                  <span className="ml-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">most recent:</span>
                 </p>
                 <ul className="space-y-1">
                   {failures.slice(0, 5).map((f) => (
                     <li key={f.id} className="rounded border bg-muted/20 px-2 py-1 text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-mono text-[11px]">{f.operation}</span>
-                        <span className="text-[11px] text-muted-foreground">{new Date(f.createdAt).toLocaleString()}</span>
+                        <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{new Date(f.createdAt).toLocaleString()}</span>
                       </div>
-                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={f.error ?? undefined}>
+                      <p className="mt-0.5 truncate font-mono text-[11px] tracking-[0.02em] text-muted-foreground" title={f.error ?? undefined}>
                         {f.error ?? "no error message"}
                       </p>
                     </li>
@@ -279,26 +281,26 @@ export default async function AgentsPage() {
             )}
           </div>
 
-          <div className="rounded-lg border bg-card p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Limits (rate / token)</p>
+          <div className="rounded-lg border border-border/80 bg-card p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Limits (rate / token)</p>
             <p className="mt-2 text-xs text-muted-foreground">
               Provider-enforced. No app-level rate limit is applied; token usage below is the ledger for cost/throughput monitoring.
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded border bg-muted/20 p-2">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Input tokens (last 20)</p>
+                <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Input tokens (last 20)</p>
                 <p className="mt-1 font-mono text-sm tabular-nums">{totalInputTokens}</p>
               </div>
               <div className="rounded border bg-muted/20 p-2">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Output tokens</p>
+                <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Output tokens</p>
                 <p className="mt-1 font-mono text-sm tabular-nums">{totalOutputTokens}</p>
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">Estimated cost: sum via AiUsageLog.estimatedCostUsd when provider reports usage (not yet, ~4 chars/token estimate).</p>
+            <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Estimated cost: sum via AiUsageLog.estimatedCostUsd when provider reports usage (not yet, ~4 chars/token estimate).</p>
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground">
+        <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
           Source: AiUsageLog (tenant-scoped, last 20) · Status reflects DB; gateway unreachable surfaces as error, not success. Base URLs masked via maskUrl, credentialRef never leaves server.
         </p>
       </div>

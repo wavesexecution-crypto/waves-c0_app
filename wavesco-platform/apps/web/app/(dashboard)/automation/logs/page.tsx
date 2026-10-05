@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { auth } from "@/lib/auth";
+import { requireInternalAccess, requireTenantId } from "@/lib/tenant";
 import { N8nGate } from "@/components/automation/n8n-gate";
 import { getExecutions } from "@/lib/wavesco/n8n";
 import { formatIST } from "@/lib/wavesco/time";
@@ -6,7 +8,12 @@ import { formatIST } from "@/lib/wavesco/time";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Execution logs" };
 
-export default function LogsPage() {
+export default async function LogsPage() {
+  const session = await auth();
+  requireTenantId(session);
+  // n8n execution ids and workflow internals. Operator-only.
+  requireInternalAccess(session);
+
   return (
     <div className="space-y-6">
       <div>

@@ -38,13 +38,13 @@ export function AgentToggle({ aiEnabled, hasConfig }: { aiEnabled: boolean; hasC
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Control</span>
+      <span className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Control</span>
       {aiEnabled ? (
         <button
           type="button"
           disabled={!!pending}
           onClick={() => doAction("disable")}
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-300"
+          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-300"
         >
           {pending === "disable" ? "Disabling…" : "Disable gateway"}
         </button>
@@ -53,7 +53,7 @@ export function AgentToggle({ aiEnabled, hasConfig }: { aiEnabled: boolean; hasC
           type="button"
           disabled={!!pending}
           onClick={() => doAction("enable")}
-          className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
         >
           {pending === "enable" ? "Enabling…" : hasConfig ? "Enable gateway" : "Enable (create config)"}
         </button>
@@ -111,34 +111,34 @@ export function AgentConfigureForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-lg border bg-card p-4">
-      <h3 className="text-sm font-semibold">Configure gateway</h3>
-      <p className="text-xs text-muted-foreground">Provider / model / baseUrl are server-side only. Credential is stored as credentialRef (env:VAR) and never shown.</p>
+    <form onSubmit={onSubmit} className="space-y-3 rounded-lg border border-border/80 bg-card p-4">
+      <h3 className="font-sans text-[13px] font-semibold">Configure gateway</h3>
+      <p className="font-sans text-[13px] leading-5 text-muted-foreground">Provider / model / baseUrl are server-side only. Credential is stored as credentialRef (env:VAR) and never shown.</p>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="space-y-1">
-          <span className="text-xs font-medium">Provider</span>
-          <select value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+          <span className="font-sans text-[13px] font-medium tracking-[-0.01em]">Provider</span>
+          <select value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full rounded-lg border border-border/80 bg-background px-2 py-1.5 font-sans text-[13px]">
             <option value="ollama_cloud">ollama_cloud</option>
             <option value="openai">openai</option>
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium">Model</span>
-          <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="gemma3:27b" className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" />
+          <span className="font-sans text-[13px] font-medium tracking-[-0.01em]">Model</span>
+          <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="gemma3:27b" className="w-full rounded-lg border border-border/80 bg-background px-2 py-1.5 font-sans text-[13px]" />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium">Base URL (masked in display)</span>
+          <span className="font-sans text-[13px] font-medium tracking-[-0.01em]">Base URL (masked in display)</span>
           <input
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="https://ollama.com/v1"
-            className="w-full rounded-md border bg-background px-2 py-1.5 font-mono text-sm"
+            className="w-full rounded-lg border border-border/80 bg-background px-2 py-1.5 font-mono font-sans text-[13px]"
           />
           <span className="text-[11px] text-muted-foreground">Leave masked value unchanged to keep existing, or enter a new URL.</span>
         </label>
       </div>
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={pending} className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+        <button type="submit" disabled={pending} className="rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
           {pending ? "Saving…" : "Save configure"}
         </button>
         {error ? <span className="text-xs text-red-500">{error}</span> : null}

@@ -10,6 +10,7 @@ import { MetricCard, SectionHeader, StatusPill } from "@/components/command/prim
 import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
 import { BatchPanel, LeadStageButtons, OrderButtons } from "@/components/acquisition/pipeline-actions";
+import { safeErrorText } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Outreach Pipeline" };
@@ -49,7 +50,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
     leads = listPipelineLeads();
     facets = await getFacets();
   } catch (e) {
-    corpusError = e instanceof Error ? e.message : "Lead Engine unreachable";
+    corpusError = safeErrorText(e, "The lead database is temporarily unavailable. Metrics return automatically.", "leads:corpus");
   }
 
   const researches = new Map<
@@ -213,8 +214,8 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Outreach Pipeline</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Outreach Pipeline</h1>
+          <p className="mt-1 max-w-3xl font-sans text-[13px] leading-5 text-muted-foreground">
             Lead Intelligence → Research → Email Check → Individual Outreach Orders → Approval Queue →
             existing cold-email infrastructure → Follow-ups. Every number below is computed from the live
             corpus and database — zero means zero.
@@ -224,10 +225,10 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
       </div>
 
       {corpusError ? (
-        <div className="rounded-lg border border-dashed border-red-500/40 p-6 text-sm">
-          <p className="font-medium">Lead Engine unavailable</p>
-          <p className="text-muted-foreground">{corpusError}</p>
-          <a href="/acquisition/pipeline" className="mt-3 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+        <div className="rounded-lg border border-dashed border-red-500/30 bg-card p-6">
+          <p className="font-sans text-[13px] font-medium text-foreground">Lead Engine unavailable</p>
+          <p className="mt-1 font-mono text-[11px] leading-5 text-muted-foreground">{corpusError}</p>
+          <a href="/acquisition/pipeline" className="mt-3 inline-flex rounded-lg border border-border/80 bg-card px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.08em] hover:bg-muted/50">
             Retry
           </a>
         </div>
@@ -267,108 +268,108 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
           </section>
 
           {/* Filters */}
-          <form action="/acquisition/pipeline" className="grid gap-2 rounded-lg border bg-card p-3 sm:grid-cols-3 lg:grid-cols-8">
-            <select name="emailStatus" defaultValue={sp.emailStatus ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-sm">
+          <form action="/acquisition/pipeline" className="grid gap-2 rounded-lg border border-border/80 bg-card p-3 sm:grid-cols-3 lg:grid-cols-8">
+            <select name="emailStatus" defaultValue={sp.emailStatus ?? ""} className="rounded-lg border border-border/80 bg-background px-2 py-1.5 font-sans text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
               <option value="">Email status · all</option>
               {Object.keys(countsByStatus).map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
-            <select name="outreachStatus" defaultValue={sp.outreachStatus ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-sm">
+            <select name="outreachStatus" defaultValue={sp.outreachStatus ?? ""} className="rounded-lg border border-border/80 bg-background px-2 py-1.5 font-sans text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
               <option value="">Outreach status · all</option>
               <option value="none">no order</option>
               {["READY_FOR_APPROVAL", "PENDING", "APPROVED", "SENT", "DELIVERED", "FAILED", "REJECTED", "CANCELLED"].map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
-            <select name="approvalStatus" defaultValue={sp.approvalStatus ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-sm">
+            <select name="approvalStatus" defaultValue={sp.approvalStatus ?? ""} className="rounded-lg border border-border/80 bg-background px-2 py-1.5 font-sans text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
               <option value="">Approval · all</option>
               <option value="queued">queued</option>
               <option value="pending">pending decision</option>
               <option value="decided">decided</option>
             </select>
-            <select name="sendStatus" defaultValue={sp.sendStatus ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-sm">
+            <select name="sendStatus" defaultValue={sp.sendStatus ?? ""} className="rounded-lg border border-border/80 bg-background px-2 py-1.5 font-sans text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
               <option value="">Send · all</option>
               <option value="sent">sent</option>
               <option value="failed">failed</option>
               <option value="not_sent">not sent</option>
             </select>
-            <select name="replyStatus" defaultValue={sp.replyStatus ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-sm">
+            <select name="replyStatus" defaultValue={sp.replyStatus ?? ""} className="rounded-lg border border-border/80 bg-background px-2 py-1.5 font-sans text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
               <option value="">Reply · all</option>
               <option value="replied">replied</option>
               <option value="no_reply">no reply</option>
             </select>
-            <select name="category" defaultValue={sp.category ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-sm">
+            <select name="category" defaultValue={sp.category ?? ""} className="rounded-lg border border-border/80 bg-background px-2 py-1.5 font-sans text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
               <option value="">Category · all</option>
               {(facets?.categories ?? []).map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <input name="location" defaultValue={sp.location ?? ""} placeholder="Location contains…" className="rounded-md border bg-transparent px-2 py-1.5 text-sm" />
-            <button type="submit" className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">
+            <input name="location" defaultValue={sp.location ?? ""} placeholder="Location contains…" className="rounded-lg border border-border/80 bg-background px-2 py-1.5 font-sans text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+            <button type="submit" className="rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90">
               Apply filters
             </button>
           </form>
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
+            <table className="w-full">
               <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2.5">Lead</th>
-                  <th className="px-3 py-2.5">Business</th>
-                  <th className="px-3 py-2.5">Email</th>
-                  <th className="px-3 py-2.5">Email Status</th>
-                  <th className="px-3 py-2.5">Research</th>
-                  <th className="px-3 py-2.5">Outreach</th>
-                  <th className="px-3 py-2.5">Approval / Send / Reply</th>
-                  <th className="px-3 py-2.5">Next Follow-up</th>
-                  <th className="px-3 py-2.5 text-right">Actions</th>
+                <tr className="border-b border-border/60 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                  <th className="px-3 py-2.5 font-medium">Lead</th>
+                  <th className="px-3 py-2.5 font-medium">Business</th>
+                  <th className="px-3 py-2.5 font-medium">Email</th>
+                  <th className="px-3 py-2.5 font-medium">Email Status</th>
+                  <th className="px-3 py-2.5 font-medium">Research</th>
+                  <th className="px-3 py-2.5 font-medium">Outreach</th>
+                  <th className="px-3 py-2.5 font-medium">Approval / Send / Reply</th>
+                  <th className="px-3 py-2.5 font-medium">Next Follow-up</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                    <td colSpan={9} className="px-4 py-10 text-center font-sans text-[13px] text-muted-foreground">
                       No leads match these filters.
                     </td>
                   </tr>
                 ) : (
                   filtered.slice(0, 60).map((r) => (
-                    <tr key={r.key} className="border-b last:border-0 align-top hover:bg-accent/40">
-                      <td className="px-3 py-2.5 font-mono text-[11px]">
+                    <tr key={r.key} className="border-b border-border/60 last:border-0 align-top hover:bg-muted/20">
+                      <td className="px-3 py-2.5 font-mono text-[11px] tabular-nums">
                         {r.leadId}
-                        <Link href={`/acquisition/leads/${encodeURIComponent(r.key)}`} className="mt-0.5 block text-[10px] text-muted-foreground underline-offset-2 hover:underline">
+                        <Link href={`/acquisition/leads/${encodeURIComponent(r.key)}`} className="mt-0.5 block font-mono text-[11px] tracking-[0.02em] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
                           View lead
                         </Link>
                       </td>
                       <td className="max-w-[160px] truncate px-3 py-2.5">
-                        <span className="font-medium">{r.business}</span>
-                        <span className="block text-[11px] text-muted-foreground">{r.location || "—"}</span>
+                        <span className="font-sans text-[13px] font-medium leading-5 text-foreground">{r.business}</span>
+                        <span className="block font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{r.location || "—"}</span>
                       </td>
-                      <td className="px-3 py-2.5 font-mono text-[11px]">{r.email ?? "—"}</td>
+                      <td className="px-3 py-2.5 font-mono text-[11px] tracking-[-0.01em] text-foreground">{r.email ?? "—"}</td>
                       <td className="px-3 py-2.5"><StatusPill state={r.emailStatus.toLowerCase()} /></td>
-                      <td className="px-3 py-2.5 text-[11px] text-muted-foreground">
+                      <td className="px-3 py-2.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
                         {r.researchedAt ? `yes · ${formatIST(r.researchedAt)}` : "not yet"}
                       </td>
                       <td className="px-3 py-2.5">
                         {r.order ? (
                           <>
                             <StatusPill state={r.order.status.toLowerCase()} />
-                            <span className="mt-1 block max-w-[200px] truncate text-[10px] text-muted-foreground">{r.order.subject}</span>
+                            <span className="mt-1 block max-w-[200px] truncate font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{r.order.subject}</span>
                           </>
                         ) : (
-                          <span className="text-[11px] text-muted-foreground">—</span>
+                          <span className="font-mono text-[11px] text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                      <td className="px-3 py-2.5 font-mono text-[11px] leading-relaxed tracking-[0.02em] text-muted-foreground">
                         #{r.order?.approvalId ?? "—"}
                         <br />
                         send: {r.order?.deliveryStatus ?? (r.order?.sentAt ? "dispatched" : "—")}
                         <br />
                         reply: {r.order?.replyStatus ?? "none"}
                       </td>
-                      <td className="px-3 py-2.5 text-[11px] text-muted-foreground">{formatIST(r.nextFollowUp)}</td>
+                      <td className="px-3 py-2.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{formatIST(r.nextFollowUp)}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex flex-col items-end gap-2">
                           <LeadStageButtons nameKey={r.key} />
@@ -384,10 +385,10 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
             </table>
           </div>
           {filtered.length > 60 ? (
-            <p className="text-[11px] text-muted-foreground">Showing first 60 of {filtered.length} filtered rows — narrow the filters to see more.</p>
+            <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Showing first 60 of {filtered.length} filtered rows — narrow the filters to see more.</p>
           ) : null}
 
-          <p className="text-[11px] text-muted-foreground">
+          <p className="font-mono text-[11px] leading-relaxed tracking-[0.02em] text-muted-foreground">
             Approve dispatches synchronously through the existing n8n decide endpoint → Email Outbox → SMTP.
             &quot;SENT&quot; is recorded only when the provider accepts; failures keep their reason. Follow-ups are
             scheduled automatically after a successful send and stop on bounce, opt-out or reply.

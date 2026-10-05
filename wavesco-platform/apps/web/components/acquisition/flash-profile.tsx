@@ -143,6 +143,9 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [activating, setActivating] = useState(false);
+  const [activateMsg, setActivateMsg] = useState<string | null>(null);
+  const [activated, setActivated] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -221,7 +224,7 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
 
   const doSave = useCallback(
     async (p: Record<string, unknown>) => {
-      if (!Object.keys(p).length) return;
+      if (!Object.keys(p).length) return true;
       setSaving(true);
       setSaveError(null);
       try {
@@ -231,10 +234,19 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
           body: JSON.stringify(p),
         });
         const j = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(j.errors?.join?.(", ") || j.error || `Save failed ${res.status}`);
+        if (!res.ok) {
+          throw new Error(
+            j.errors?.join?.(", ") ||
+              j.reason ||
+              (typeof j.error === "string" && j.error !== "internal" ? j.error : null) ||
+              `Save failed (${res.status})`
+          );
+        }
         setLastSavedAt(new Date().toLocaleTimeString());
+        return true;
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : String(e));
+        return false;
       } finally {
         setSaving(false);
       }
@@ -300,9 +312,44 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
     else if (step > 0) setStep((s) => s - 1);
   }
 
-  async function handleSaveExit() {
-    await doSave(payload);
+async function handleSaveExit() {
+    const saved = await doSave(payload);
+    // Do not leave the wizard implying success when the write failed.
+    if (!saved) return;
     router.push("/acquisition");
+  }
+
+  async function handleActivate() {
+    setActivating(true);
+    setActivateMsg(null);
+    try {
+      // Activation is a real entitlement-bearing transition — confirm it.
+      if (typeof window !== "undefined" && !window.confirm("Activate Acquisition OS? The OS will start operating on this brief.")) {
+        return;
+      }
+      const res = await fetch("/api/acquisition/profile/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "activate" }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          j.reason ||
+            j.whatNext ||
+            (typeof j.error === "string" && j.error !== "internal" ? j.error : null) ||
+            `Activation failed (${res.status})`
+        );
+      }
+      setActivated(true);
+      setActivateMsg("Activated — Acquisition OS is now operating.");
+      // The page header renders server-side status; refresh so it clears.
+      router.refresh();
+    } catch (e) {
+      setActivateMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setActivating(false);
+    }
   }
 
   async function handleSubmit() {
@@ -318,11 +365,15 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
         }
       }
     }
-    await doSave(payload);
+    // Only show the green "ready" state when the write actually landed.
+    const saved = await doSave(payload);
+    if (!saved) return;
     setMode("done");
     try {
       localStorage.removeItem(LS_STEP);
-    } catch {}
+    } catch {
+      // non-critical
+    }
   }
 
   const progress = isDone ? 100 : isReview ? 100 : ((step + 1) / total) * 100;
@@ -331,19 +382,38 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
   if (isDone) {
     return (
       <div className="mx-auto max-w-xl px-4 py-10 sm:py-16">
-        <div className="rounded-2xl border bg-card p-8 shadow-sm sm:p-10 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white">
+        <div className="rounded-lg border border-border/80 bg-card p-8 sm:p-10 text-center">
+<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white">
             <span className="text-xl">✓</span>
           </div>
           <h1 className="mt-4 text-2xl font-semibold tracking-tight">Your Acquisition Profile is ready.</h1>
-          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-            We have everything Acquisition OS needs to understand your company. Your profile is saved and ready to operate.
+          <p className="mt-2 font-sans text-[13px] text-muted-foreground leading-relaxed">
+            We have everything Acquisition OS needs to understand your company. Your profile is saved{activated ? " and the OS is activated" : ""}.{" "}
+            {!activated && "One step left: activate so the OS starts operating on this brief."}
           </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <button onClick={() => router.push("/acquisition")} className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          {/* A later autosave can fail after this screen mounted; never hide it. */}
+          {saveError ? (
+            <p className="mt-3 font-sans text-[13px] text-destructive">
+              Some answers did not save: {saveError}. Review your answers before activating.
+            </p>
+          ) : null}
+          {activateMsg && (
+            <p className={`mt-3 font-sans text-[13px] ${activated ? "text-emerald-700" : "text-destructive"}`}>{activateMsg}</p>
+          )}
+<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            {!activated ? (
+              <button onClick={handleActivate} disabled={activating} className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-6 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                {activating ? "Activating…" : "Activate Acquisition OS"}
+              </button>
+            ) : (
+              <button onClick={() => router.push("/acquisition/generate")} className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-6 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90">
+                Generate your first leads
+              </button>
+            )}
+            <button onClick={() => router.push("/acquisition")} className="inline-flex h-10 items-center justify-center rounded-lg border border-border/80 px-6 font-sans text-[13px] font-medium hover:bg-accent">
               Go to Acquisition OS
             </button>
-            <button onClick={() => { setMode("review"); }} className="inline-flex h-10 items-center justify-center rounded-md border px-6 text-sm font-medium hover:bg-accent">
+            <button onClick={() => { setMode("review"); }} className="inline-flex h-10 items-center justify-center rounded-lg border border-border/80 px-6 font-sans text-[13px] font-medium hover:bg-accent">
               Review answers
             </button>
           </div>
@@ -358,10 +428,10 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">Review</p>
-            <span className="text-xs text-muted-foreground">{saving ? "Saving…" : lastSavedAt ? `Saved ${lastSavedAt}` : "Autosaved"}</span>
+            <span className="font-sans text-[13px] leading-5 text-muted-foreground">{saving ? "Saving…" : lastSavedAt ? `Saved ${lastSavedAt}` : "Autosaved"}</span>
           </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Review your answers</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Check everything before we finish. You can edit any answer.</p>
+          <p className="mt-1 font-sans text-[13px] text-muted-foreground">Check everything before we finish. You can edit any answer.</p>
           <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-muted">
             <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
           </div>
@@ -372,14 +442,14 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
             const vals = s.fields.map((f) => answers[f.key]?.trim() || "—").join(" · ");
             const hasMissing = s.fields.some((f) => f.required && !(answers[f.key] || "").trim());
             return (
-              <div key={s.id} className="flex items-start justify-between gap-4 rounded-xl border bg-card p-4">
+              <div key={s.id} className="flex items-start justify-between gap-4 rounded-lg border border-border/80 bg-card p-4">
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Step {idx + 1}</p>
-                  <p className="text-sm font-medium leading-tight">{s.question}</p>
-                  <p className={`mt-1 text-sm break-words ${hasMissing ? "text-amber-600" : "text-muted-foreground"}`}>{vals}</p>
+                  <p className="font-sans text-[13px] leading-5 text-muted-foreground">Step {idx + 1}</p>
+                  <p className="font-sans text-[13px] font-medium leading-tight">{s.question}</p>
+                  <p className={`mt-1 font-sans text-[13px] break-words ${hasMissing ? "text-amber-600" : "text-muted-foreground"}`}>{vals}</p>
                   {hasMissing && <p className="text-xs text-amber-600 mt-1">Missing required field</p>}
                 </div>
-                <button onClick={() => { setMode("form"); setStep(idx); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent">
+                <button onClick={() => { setMode("form"); setStep(idx); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="shrink-0 rounded-lg border border-border/80 px-3 py-1.5 text-xs font-medium hover:bg-accent">
                   Edit
                 </button>
               </div>
@@ -387,13 +457,17 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
           })}
         </div>
 
-        {saveError && <p className="mt-4 text-sm text-destructive">{saveError}</p>}
+        {saveError && <p className="mt-4 font-sans text-[13px] text-destructive">{saveError}</p>}
 
-        <div className="mt-6 flex items-center justify-between gap-3">
-          <button onClick={handleBack} className="inline-flex h-10 items-center justify-center rounded-md border px-5 text-sm font-medium hover:bg-accent">← Back</button>
-          <div className="flex gap-3">
-            <button onClick={handleSaveExit} className="hidden sm:inline-flex h-10 items-center justify-center rounded-md px-4 text-sm text-muted-foreground hover:text-foreground">Save & exit</button>
-            <button onClick={handleSubmit} disabled={saving} className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button onClick={handleBack} className="inline-flex h-10 items-center justify-center rounded-lg border border-border/80 px-5 font-sans text-[13px] font-medium hover:bg-accent">Back</button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            {/* Previously `hidden sm:inline-flex` with no mobile replacement —
+                on a phone a client who wanted out lost the affordance entirely. */}
+            <button onClick={handleSaveExit} className="inline-flex h-10 w-full items-center justify-center rounded-lg px-4 font-sans text-[13px] text-muted-foreground hover:text-foreground sm:w-auto">
+              Save & exit
+            </button>
+<button onClick={handleSubmit} disabled={saving} className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-primary px-6 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:w-auto">
               {saving ? "Saving…" : "Confirm — Profile ready"}
             </button>
           </div>
@@ -415,7 +489,7 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
         </div>
         <div className="mt-2 flex items-center justify-between">
           <p className="text-xs font-medium text-muted-foreground">{stepLabel}</p>
-          <span className="text-xs text-muted-foreground">{saving ? "Saving…" : lastSavedAt ? `Saved • ${lastSavedAt}` : loadingProfile ? "Loading…" : "Autosaved"}</span>
+          <span className="font-sans text-[13px] leading-5 text-muted-foreground">{saving ? "Saving…" : lastSavedAt ? `Saved • ${lastSavedAt}` : loadingProfile ? "Loading…" : "Autosaved"}</span>
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div className="h-full bg-foreground transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
@@ -423,10 +497,10 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
       </div>
 
       {/* Card */}
-      <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-lg border border-border/80 bg-card overflow-hidden">
         <div className="px-6 pt-7 pb-6 sm:px-8 sm:pt-8">
           <h1 className="text-xl font-semibold tracking-tight leading-tight sm:text-2xl">{current!.question}</h1>
-          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{current!.subtitle}</p>
+          <p className="mt-2 font-sans text-[13px] text-muted-foreground leading-relaxed">{current!.subtitle}</p>
 
           <div className="mt-6 space-y-4">
             {current!.fields.map((f) => {
@@ -443,7 +517,7 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
                       onChange={(e) => updateAnswer(f.key, e.target.value)}
                       placeholder={f.placeholder}
                       rows={f.key.includes("whatWeSell") || f.key.includes("valueProp") || f.key.includes("differentiators") ? 4 : 3}
-                      className="mt-1.5 flex min-h-[96px] w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="mt-1.5 flex min-h-[96px] w-full rounded-lg border border-border/80 border-input bg-background px-3 py-2.5 font-sans text-[13px] shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   ) : (
                     <input
@@ -451,7 +525,7 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
                       value={val}
                       onChange={(e) => updateAnswer(f.key, e.target.value)}
                       placeholder={f.placeholder}
-                      className="mt-1.5 flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="mt-1.5 flex h-10 w-full rounded-lg border border-border/80 border-input bg-background px-3 py-2 font-sans text-[13px] shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   )}
                 </label>
@@ -459,15 +533,15 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
             })}
           </div>
 
-          {validationError && <p className="mt-3 text-sm text-destructive">{validationError}</p>}
-          {saveError && <p className="mt-3 text-sm text-destructive">{saveError}</p>}
+          {validationError && <p className="mt-3 font-sans text-[13px] text-destructive">{validationError}</p>}
+          {saveError && <p className="mt-3 font-sans text-[13px] text-destructive">{saveError}</p>}
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t bg-muted/20 px-6 py-4 sm:px-8">
-          <button onClick={handleBack} disabled={step === 0} className="inline-flex h-10 items-center justify-center gap-1 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed">
+          <button onClick={handleBack} disabled={step === 0} className="inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-border/80 bg-background px-4 font-sans text-[13px] font-medium hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed">
             ← Back
           </button>
-          <button onClick={handleNext} className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">
+          <button onClick={handleNext} className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-6 font-sans text-[13px] font-medium text-primary-foreground shadow hover:bg-primary/90">
             {step === total - 1 ? "Review →" : "Continue →"}
           </button>
         </div>
@@ -477,7 +551,7 @@ export function FlashProfile({ initialProfile }: { initialProfile: any | null })
 
       {hydrated && Object.values(answers).some(Boolean) && step === 0 && (
         <div className="mt-3 text-center">
-          <span className="text-xs text-muted-foreground">Tip: use Back / Continue to move through the cards. You can leave any time — resume where you left off.</span>
+          <span className="font-sans text-[13px] leading-5 text-muted-foreground">Tip: use Back / Continue to move through the cards. You can leave any time — resume where you left off.</span>
         </div>
       )}
     </div>

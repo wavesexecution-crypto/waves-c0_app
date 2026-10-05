@@ -9,10 +9,12 @@ export function LeadsExportButton({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   async function handleExport() {
     setPending(true);
     setError(null);
+    setNote(null);
     try {
       // sanitize filters: drop empty
       const body: Record<string, unknown> = {};
@@ -28,7 +30,18 @@ export function LeadsExportButton({
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        throw new Error((j as { error?: string }).error ?? `Export failed ${res.status}`);
+        const rec = j as { error?: string; reason?: string; whatNext?: string };
+        throw new Error(rec.whatNext ?? rec.reason ?? rec.error ?? `Export failed (${res.status})`);
+      }
+      // Say so when the cap truncated the result — a client must not read a
+      // partial file as the complete filtered set.
+      const truncated = res.headers.get("x-truncated") === "true";
+      const exported = res.headers.get("x-exported-rows");
+      const total = res.headers.get("x-total-rows");
+      if (truncated) {
+        setNote(`Exported the top ${exported ?? "?"} of ${total ?? "?"} matching leads — narrow the filters for the rest.`);
+      } else if (exported) {
+        setNote(`Exported ${exported} lead${exported === "1" ? "" : "s"}.`);
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -49,17 +62,22 @@ export function LeadsExportButton({
   }
 
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={handleExport}
         disabled={pending}
-        className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:opacity-50"
-        title="Export current filtered leads as CSV (max 1000, tenant-scoped)"
+        className="rounded-lg border border-border/80 px-3 py-1.5 font-sans text-[13px] font-medium hover:bg-accent disabled:opacity-50"
+        title="Export the leads currently shown, as CSV (up to 1000 rows)"
       >
         {pending ? "Exporting…" : "Export CSV"}
       </button>
-      {error ? <span className="text-xs text-red-500">{error}</span> : null}
+      {error ? (
+        <span className="max-w-[220px] truncate text-xs text-red-500" title={error}>
+          {error}
+        </span>
+      ) : null}
+      {note && !error ? <span className="max-w-[260px] text-xs text-muted-foreground">{note}</span> : null}
     </span>
   );
 }

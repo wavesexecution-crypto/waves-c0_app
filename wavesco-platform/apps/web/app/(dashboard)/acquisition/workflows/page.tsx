@@ -6,6 +6,7 @@ import { getWorkflows, getExecutions, readAutomationManifest, n8nBaseUrl } from 
 import { StatusPill } from "@/components/command/primitives";
 import { AutoRefresh } from "@/components/command/auto-refresh";
 import { WorkflowControls, WorkflowHistoryButton } from "@/components/acquisition/workflow-controls";
+import { safeErrorText } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Workflows" };
@@ -79,7 +80,7 @@ export default async function WorkflowsPage() {
         error = wfRes.error ?? "n8n unreachable";
       }
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = safeErrorText(e, "Automation is temporarily unavailable.", "workflows:load");
     }
     // If workflows empty and no fallback, try manifest as last resort
     if (workflows.length === 0 && !error && !fallback) {
@@ -105,17 +106,18 @@ export default async function WorkflowsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Workflows</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Automation</p>
+          <h1 className="mt-1 font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Workflows</h1>
+          <p className="mt-1.5 max-w-2xl font-sans text-[13px] leading-5 text-muted-foreground">
             n8n automation control — enable/disable, execute, history, retry failed, inspect failures, view workflow state. Server-side key only, never exposed to browser.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={10_000} />
           <StatusPill state={isBlocked ? "disconnected" : fallback ? "degraded" : error ? "error" : "connected"} />
-          <span className="text-xs text-muted-foreground">{isBlocked ? "BLOCKED" : fallback ? "FALLBACK MANIFEST" : error ? "ERROR" : "LIVE"}</span>
+          <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{isBlocked ? "BLOCKED" : fallback ? "FALLBACK MANIFEST" : error ? "ERROR" : "LIVE"}</span>
         </div>
       </div>
 
@@ -125,7 +127,7 @@ export default async function WorkflowsPage() {
           <p className="mt-1 text-xs text-muted-foreground">
             Workflows control is BLOCKED. Set <code className="rounded bg-muted px-1 py-0.5 font-mono">N8N_BASE_URL</code> and <code className="rounded bg-muted px-1 py-0.5 font-mono">N8N_API_KEY</code> (server-side only) to enable live n8n state. No fake success is shown.
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Health: {health.reason} · masked url: {String(masked)}</p>
+          <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Health: {health.reason} · masked url: {String(masked)}</p>
         </div>
       ) : null}
 
@@ -139,15 +141,15 @@ export default async function WorkflowsPage() {
       {!isBlocked && error ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 text-sm">
           <p className="font-medium text-red-600 dark:text-red-400">Workflows unreachable</p>
-          <p className="text-xs text-muted-foreground">{error}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Base: {masked} · Verify n8n instance and API key via Integrations → Test Connection.</p>
-          <a href="/acquisition/workflows" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">{error}</p>
+          <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Base: {masked} · Verify n8n instance and API key via Integrations → Test Connection.</p>
+          <a href="/acquisition/workflows" className="mt-2 inline-block rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
             Retry
           </a>
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-xs">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-card p-3 text-xs">
         <span className="font-medium uppercase tracking-widest text-muted-foreground">Control:</span>
         <span className="rounded-full border px-2 py-0.5">Enable / Disable toggle</span>
         <span className="rounded-full border px-2 py-0.5">Execute</span>
@@ -155,16 +157,16 @@ export default async function WorkflowsPage() {
         <span className="rounded-full border px-2 py-0.5">Retry failed</span>
         <span className="rounded-full border px-2 py-0.5">Inspect failures</span>
         <span className="rounded-full border px-2 py-0.5">View workflow state</span>
-        <span className="ml-auto text-[11px] text-muted-foreground">
+        <span className="ml-auto font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
           {isBlocked ? "0 workflows · BLOCKED" : `${workflows.length} workflows · ${executions.length} executions · state reflects n8n + audit`}
         </span>
       </div>
 
       {isBlocked ? (
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr className="border-b border-border/60 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 <th className="px-4 py-2.5">Workflow</th>
                 <th className="px-4 py-2.5">ID</th>
                 <th className="px-4 py-2.5">State</th>
@@ -182,18 +184,18 @@ export default async function WorkflowsPage() {
           </table>
         </div>
       ) : workflows.length === 0 && !error ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-border/80 p-8 text-center text-sm text-muted-foreground">
           <p>No workflows found. If n8n is configured, verify API key has workflow read access.</p>
-          <a href="/acquisition/integrations" className="mt-3 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+          <a href="/acquisition/integrations" className="mt-3 inline-block rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
             Test n8n Connection
           </a>
         </div>
       ) : workflows.length > 0 ? (
         <div className="space-y-4">
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-border/60 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                   <th className="px-4 py-2.5">Workflow</th>
                   <th className="px-4 py-2.5">ID</th>
                   <th className="px-4 py-2.5">State</th>
@@ -207,14 +209,14 @@ export default async function WorkflowsPage() {
                   const failedExecs = (w.executions ?? []).filter((e) => (e.status ?? "").toLowerCase().includes("fail") || (e.status ?? "").toLowerCase().includes("error")).length;
                   const lastFailed = (w.executions ?? []).find((e) => (e.status ?? "").toLowerCase().includes("fail") || (e.status ?? "").toLowerCase().includes("error"));
                   return (
-                    <tr key={w.id} className="border-b last:border-0 hover:bg-accent/40">
+                    <tr key={w.id} className="border-b border-border/60 last:border-0 hover:bg-card-hover">
                       <td className="px-4 py-3">
                         <div className="font-medium">{w.name}</div>
                         {w._fallback ? <span className="text-[11px] text-amber-600 dark:text-amber-400">manifest · not live</span> : null}
                         {w.tags && w.tags.length > 0 ? (
                           <div className="mt-1 flex flex-wrap gap-1">
                             {w.tags.map((t) => (
-                              <span key={t.id} className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                              <span key={t.id} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
                                 {t.name}
                               </span>
                             ))}
@@ -224,19 +226,19 @@ export default async function WorkflowsPage() {
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{w.id}</td>
                       <td className="px-4 py-3">
                         <StatusPill state={w._fallback ? "unavailable" : stateForWorkflow(!!w.active)} />
-                        <div className="mt-1 text-[11px] text-muted-foreground">{w.active ? "active" : "inactive"}</div>
-                        {w.updatedAt ? <div className="text-[11px] text-muted-foreground/60">{new Date(w.updatedAt).toLocaleString()}</div> : null}
+                        <div className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{w.active ? "active" : "inactive"}</div>
+                        {w.updatedAt ? <div className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground/60">{new Date(w.updatedAt).toLocaleString()}</div> : null}
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {w.trigger ? <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{w.trigger}</span> : <span className="text-muted-foreground">—</span>}
-                        {w.purpose ? <p className="mt-1 max-w-[260px] text-[11px] text-muted-foreground">{w.purpose}</p> : null}
+                        {w.purpose ? <p className="mt-1 max-w-[260px] font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{w.purpose}</p> : null}
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {failedExecs > 0 ? (
                           <div>
                             <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400">{failedExecs} failed</span>
                             {lastFailed ? (
-                              <p className="mt-1 max-w-[180px] truncate text-[11px] text-muted-foreground" title={JSON.stringify(lastFailed)}>
+                              <p className="mt-1 max-w-[180px] truncate font-mono text-[11px] tracking-[0.02em] text-muted-foreground" title={JSON.stringify(lastFailed)}>
                                 Last failure: {lastFailed.status} @ {lastFailed.stoppedAt ?? lastFailed.startedAt ?? "—"}
                               </p>
                             ) : null}
@@ -254,12 +256,12 @@ export default async function WorkflowsPage() {
                       </td>
                       <td className="px-4 py-3">
                         {w._fallback ? (
-                          <span className="text-[11px] text-muted-foreground">Actions disabled in fallback mode</span>
+                          <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Actions disabled in fallback mode</span>
                         ) : (
                           <div className="flex flex-col gap-2">
                             <WorkflowControls workflowId={w.id} workflowName={w.name} active={!!w.active} />
                             <WorkflowHistoryButton workflowId={w.id} />
-                            <a href={`#view-${w.id}`} className="text-[11px] text-muted-foreground hover:text-foreground hover:underline" title="View workflow state (JSON)">
+                            <a href={`#view-${w.id}`} className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground hover:text-foreground hover:underline" title="View workflow state (JSON)">
                               View state
                             </a>
                           </div>
@@ -274,11 +276,11 @@ export default async function WorkflowsPage() {
 
           {executions.length > 0 ? (
             <div className="space-y-2">
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Recent executions (all workflows)</h2>
-              <div className="overflow-x-auto rounded-lg border bg-card">
+              <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Recent executions (all workflows)</h2>
+              <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr className="border-b border-border/60 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                       <th className="px-4 py-2">Execution</th>
                       <th className="px-4 py-2">Workflow</th>
                       <th className="px-4 py-2">Status</th>
@@ -292,7 +294,7 @@ export default async function WorkflowsPage() {
                     {executions.slice(0, 20).map((ex) => {
                       const isFailed = (ex.status ?? "").toLowerCase().includes("fail") || (ex.status ?? "").toLowerCase().includes("error");
                       return (
-                        <tr key={ex.id} className="border-b last:border-0 hover:bg-accent/40">
+                        <tr key={ex.id} className="border-b border-border/60 last:border-0 hover:bg-card-hover">
                           <td className="px-4 py-2 font-mono text-xs">{ex.id}</td>
                           <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{ex.workflowId ?? "—"}</td>
                           <td className="px-4 py-2">
@@ -312,10 +314,10 @@ export default async function WorkflowsPage() {
                                   void fd;
                                 }}
                               >
-                                <span className="text-[11px] text-muted-foreground">Use Retry failed on workflow row</span>
+                                <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Use Retry failed on workflow row</span>
                               </form>
                             ) : (
-                              <span className="text-[11px] text-muted-foreground">—</span>
+                              <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">—</span>
                             )}
                           </td>
                         </tr>
@@ -329,7 +331,7 @@ export default async function WorkflowsPage() {
         </div>
       ) : null}
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
         n8n base: {masked} · API key: {process.env.N8N_API_KEY ? "present (server-side only, never leaked to browser)" : "missing — control actions will fail until set"} · Audit: every enable/disable/execute/retry is logged to AuditLog with workflow id + actor.
       </p>
     </div>

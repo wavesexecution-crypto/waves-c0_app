@@ -39,53 +39,53 @@ export function CampaignCreateForm({
           tier: (fd.get("tier") as string) || undefined,
         });
       }}
-      className="space-y-4 rounded-lg border bg-card p-4"
+      className="space-y-4 rounded-lg border border-border/80 bg-card p-4"
     >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="text-xs text-muted-foreground">
+        <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Campaign name *
-          <input name="name" required minLength={2} maxLength={80} className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm" />
+          <input name="name" required minLength={2} maxLength={80} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]" />
         </label>
-        <label className="text-xs text-muted-foreground">
+        <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Location / city
-          <select name="location" defaultValue="" className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm">
+          <select name="location" defaultValue="" className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
             <option value="">All locations</option>
             {cities.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
         </label>
-        <label className="text-xs text-muted-foreground">
+        <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Category
-          <select name="category" defaultValue="" className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm">
+          <select name="category" defaultValue="" className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
             <option value="">All categories</option>
             {categories.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
         </label>
-        <label className="text-xs text-muted-foreground">
+        <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Lead tier
-          <select name="tier" defaultValue="all" className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm">
+          <select name="tier" defaultValue="all" className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
             <option value="all">All tiers</option>
             <option value="A">Tier A</option>
             <option value="B">Tier B</option>
             <option value="C">Tier C</option>
           </select>
         </label>
-        <label className="text-xs text-muted-foreground">
+        <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Sending limit
-          <input name="sendingLimit" type="number" min={1} max={200} placeholder="no cap" className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm" />
+          <input name="sendingLimit" type="number" min={1} max={200} placeholder="no cap" className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]" />
         </label>
       </div>
 
       {/* Exact eligibility from real data */}
-      <div className="rounded-md border p-3 text-sm">
+      <div className="rounded-lg border border-border/80 p-3 font-sans text-[13px]">
         {loading && !eligibility ? (
-          <p className="text-xs text-muted-foreground">Counting against the live corpus…</p>
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">Counting against the live corpus…</p>
         ) : eligibility ? (
           <>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Eligibility (live)</p>
+            <p className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Eligibility (live)</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-5">
               <Stat label="Selected" value={eligibility.selected} />
               <Stat label="With email" value={eligibility.withEmail} />
@@ -103,7 +103,7 @@ export function CampaignCreateForm({
       </div>
 
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={pending} className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
+        <button type="submit" disabled={pending} className="rounded-lg bg-primary px-4 py-1.5 font-sans text-[13px] font-medium text-primary-foreground disabled:opacity-50">
           {pending ? "Creating…" : "Create campaign"}
         </button>
         {state.error ? <span className="text-xs text-red-500">{state.error}</span> : null}

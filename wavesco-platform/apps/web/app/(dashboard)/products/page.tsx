@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
-import { getAcquisitionOSEntitlement, acquisitionOSProduct } from "@/lib/wavesco/entitlements";
+import { getAcquisitionOSEntitlement, acquisitionOSProduct, hasAccess } from "@/lib/wavesco/entitlements";
 import { withTenantContext } from "@wavesco/db";
 import { StatusPill } from "@/components/command/primitives";
 
@@ -11,7 +11,14 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Your Products" };
 
 function Pill({ status }: { status: string }) {
-  const s = status === "active" ? "live" : status === "inactive" ? "error" : "disconnected";
+  const s =
+    status === "active" || status === "trial"
+      ? "live"
+      : status === "expired"
+        ? "degraded"
+        : status === "suspended" || status === "cancelled" || status === "refunded" || status === "inactive"
+          ? "error"
+          : "disconnected";
   return <StatusPill state={s as any} />;
 }
 
@@ -30,7 +37,7 @@ export default async function ProductsPage() {
     });
   } catch {}
 
-  const isActive = entitlement.status === "active";
+  const isActive = hasAccess(entitlement.status);
 
   return (
     <div className="space-y-6">
@@ -56,15 +63,19 @@ export default async function ProductsPage() {
         <div className="mt-4 rounded-md border bg-muted/30 p-3 text-sm">
           {isActive ? (
             <p>
-              <span className="font-medium text-emerald-700">Active</span> — your Acquisition OS is rented and operational. Open the Control Center to operate.
+              <span className="font-medium text-emerald-700">{entitlement.status === "trial" ? "Trial" : "Active"}</span> — your Acquisition OS is
+              operational. Open the Control Center to operate.
+              {entitlement.trialExpiresAt && <> Trial ends {new Date(entitlement.trialExpiresAt).toLocaleDateString()}.</>}
+              {entitlement.expiresAt && entitlement.status === "active" && <> Access ends {new Date(entitlement.expiresAt).toLocaleDateString()}.</>}
             </p>
           ) : entitlement.status === "not_configured" ? (
             <p>
-              <span className="font-medium">Not currently active</span> — no entitlement record. When billing lands, <span className="font-mono text-xs">Choose → Rent → Pay → Entitlement active</span> will activate this card. For now the state is <span className="font-mono text-xs">not_configured</span>, not fake active.
+              <span className="font-medium">Not currently active</span> — no access grant yet. Start a free trial from Billing, or ask your
+              workspace owner to record paid access. State <span className="font-mono text-xs">not_configured</span>, not fake active.
             </p>
           ) : (
             <p>
-              <span className="font-medium">Inactive</span> — {entitlement.reason}
+              <span className="font-medium capitalize">{entitlement.status}</span> — {entitlement.reason}
             </p>
           )}
           <p className="mt-1 text-xs text-muted-foreground">{entitlement.reason}</p>
@@ -79,14 +90,12 @@ export default async function ProductsPage() {
               Open Acquisition OS
             </Link>
           ) : (
-            <a
-              href="https://wavesco.in#products"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center justify-center rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
+            <Link
+              href="/billing"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
-              Rent Acquisition OS
-            </a>
+              Start trial / Billing
+            </Link>
           )}
           <Link href="/acquisition/profile" className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm hover:bg-accent">
             Company Profile
@@ -94,7 +103,8 @@ export default async function ProductsPage() {
         </div>
 
         <p className="mt-4 text-xs text-muted-foreground">
-          Billing contract (future): <span className="font-mono">Tenant → ProductEntitlements → Acquisition OS</span> — interface `getAcquisitionOSEntitlement(tenantId)` currently reads `TenantModule` for `acquisition-os`. No payment implemented in this task.
+          Access record: <span className="font-mono">AcquisitionEntitlement</span> (one row per tenant: trial/active/expired/suspended/cancelled/refunded)
+          gates every Acquisition OS page and API. Grants are recorded idempotently with references in the audit log.
         </p>
       </div>
 

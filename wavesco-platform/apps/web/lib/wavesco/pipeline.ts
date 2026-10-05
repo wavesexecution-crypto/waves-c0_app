@@ -10,6 +10,7 @@ import {
   classifyEmail,
   coercePlanned,
   composeFallback,
+  isPositiveReply,
   type EmailCheckResult,
   type PlannedEmail,
   type PlannerFacts,
@@ -109,7 +110,7 @@ export function buildResearchRecord(lead: EngineLead): ResearchRecord {
   const ratingReviews =
     lead.rating === null && lead.reviews === null
       ? NOT_FOUND
-      : `${lead.rating ?? "?"} stars Â· ${lead.reviews ?? "?"} reviews`;
+      : `${lead.rating ?? "?"} stars · ${lead.reviews ?? "?"} reviews`;
   return {
     business: nf(lead.business),
     category: nf(lead.category),
@@ -319,6 +320,9 @@ async function callPlannerModel(facts: PlannerFacts): Promise<PlannedEmail | nul
         prompt: plannerPrompt(facts),
       }),
       cache: "no-store",
+      // Bounded: planner timeout degrades to the deterministic composer
+      // instead of hanging order creation.
+      signal: AbortSignal.timeout(60_000),
     });
     if (!res.ok) return null;
     const j = (await res.json()) as { ok?: boolean; text?: string; model?: string };
@@ -397,40 +401,51 @@ export async function createOutreachOrder(
       return { ok: false as const, error: "This recipient has previously unsubscribed and is permanently suppressed." };
     }
 
-    const order = await tx.outreachOrder.create({
-      data: {
-        tenantId,
-        version: priorVersions.reduce((m, p) => Math.max(m, p.version), 0) + 1,
-        leadKey: nameKey,
-        engineLeadId: lead.id,
-        businessName: lead.business,
-        contactName: research.contactName,
-        contactRole: research.contactRole,
-        email: verifiedEmail,
-        emailStatus: check.status,
-        researchSnapshot: {
-          business: facts.business,
-          category: facts.category,
-          location: facts.location,
-          website: facts.website,
-          presence: facts.presence,
-          problem: facts.problem,
-          opportunity: facts.opportunity,
-          serviceFit: facts.serviceFit,
-          contact: facts.contact,
-          sources: facts.sources,
-          researchedAt: research.researchedAt.toISOString(),
-        } as never,
-        opportunity: facts.opportunity !== NOT_FOUND ? facts.opportunity : null,
-        outreachAngle: facts.angleSeed !== NOT_FOUND ? facts.angleSeed : null,
-        subject: planned.subject,
-        body: planned.body,
-        followupPlan: planned.followUps as never,
-        plannerModel: planned.model,
-        confidence: planned.confidence,
-        status: "READY_FOR_APPROVAL",
-      },
-    });
+    let order;
+    try {
+      order = await tx.outreachOrder.create({
+        data: {
+          tenantId,
+          version: priorVersions.reduce((m, p) => Math.max(m, p.version), 0) + 1,
+          leadKey: nameKey,
+          engineLeadId: lead.id,
+          businessName: lead.business,
+          contactName: research.contactName,
+          contactRole: research.contactRole,
+          email: verifiedEmail,
+          emailStatus: check.status,
+          researchSnapshot: {
+            business: facts.business,
+            category: facts.category,
+            location: facts.location,
+            website: facts.website,
+            presence: facts.presence,
+            problem: facts.problem,
+            opportunity: facts.opportunity,
+            serviceFit: facts.serviceFit,
+            contact: facts.contact,
+            sources: facts.sources,
+            researchedAt: research.researchedAt.toISOString(),
+          } as never,
+          opportunity: facts.opportunity !== NOT_FOUND ? facts.opportunity : null,
+          outreachAngle: facts.angleSeed !== NOT_FOUND ? facts.angleSeed : null,
+          subject: planned.subject,
+          body: planned.body,
+          followupPlan: planned.followUps as never,
+          plannerModel: planned.model,
+          confidence: planned.confidence,
+          status: "READY_FOR_APPROVAL",
+        },
+      });
+    } catch (e: unknown) {
+      // Concurrent double-submit race: both requests passed the live-order
+      // guards, then collided on @@unique[tenantId, leadKey, version].
+      // Degrade to a retryable refusal instead of a raw 500.
+      if (typeof e === "object" && e !== null && (e as { code?: unknown }).code === "P2002") {
+        return { ok: false as const, error: "This lead already has a live outreach order (concurrent request detected). Please retry." };
+      }
+      throw e;
+    }
 
     await tx.activityEvent.create({
       data: {
@@ -480,6 +495,14 @@ export async function submitOrderToApproval(
       return { ok: false as const, error: "This recipient has unsubscribed and cannot be contacted." };
     }
 
+    // Compliance fail-closed: every outbound email must carry a working
+    // unsubscribe link. Without UNSUBSCRIBE_SECRET no link can be minted, so
+    // refuse to queue rather than send a footer-less email.
+    const unsubscribeUrl = buildUnsubscribeUrl(tenantId, order.email);
+    if (!unsubscribeUrl) {
+      return { ok: false as const, error: "Unsubscribe link unavailable — configure UNSUBSCRIBE_SECRET before queuing outreach." };
+    }
+
     const res = await submitApproval({
       type: "cold_email",
       recipient: order.email,
@@ -489,7 +512,7 @@ export async function submitOrderToApproval(
       body: appendUnsubscribeFooter(
         order.body,
         order.businessName,
-        buildUnsubscribeUrl(tenantId, order.email),
+        unsubscribeUrl,
       ),
     });
     if (!res.ok) {
@@ -773,7 +796,13 @@ async function scheduleFollowUpsAfterSend(tenantId: string, orderId: string, tx:
   if (!lead || lead.opted_out === 1 || lead.bounced === 1 || lead.reply_status) return;
 
   const rawPlan: unknown = order.followupPlan;
-  const plan = Array.isArray(rawPlan) ? (rawPlan as { offsetDays: number; subject: string; body: string }[]) : [];
+  const rawSteps = Array.isArray(rawPlan) ? (rawPlan as { offsetDays: number; subject: string; body: string }[]) : [];
+  // Validate planner output: offsets must be finite future days within a
+  // sane window. Invalid steps are dropped (and logged via the batch counts
+  // path by the caller) — never scheduled as past/immediate/NaN dates.
+  const plan = rawSteps.filter(
+    (s) => s && Number.isFinite(s.offsetDays) && s.offsetDays >= 1 && s.offsetDays <= 90,
+  );
   let seq = 0;
   for (const step of plan) {
     seq += 1;
@@ -799,35 +828,11 @@ async function scheduleFollowUpsAfterSend(tenantId: string, orderId: string, tx:
 }
 
 /**
- * Conservative positive-reply classification.
- *
- * The platform has no sentiment classifier; `reply_status` is a raw class
- * string from the lead engine corpus. Only EXPLICIT positive markers are
- * treated as a positive response — never every reply.
+ * Conservative positive-reply classification lives in outreach-logic.ts
+ * (pure, shared with the conversation layer). Re-exported here so existing
+ * importers keep working.
  */
-function isPositiveReply(status?: string | null): boolean {
-  if (!status) return false;
-  const s = status.trim().toLowerCase();
-  if (!s || ["none", "no reply", "no", "unsubscribed", "unsubscribe"].includes(s)) {
-    return false;
-  }
-  const positive = [
-    "interested",
-    "positive",
-    "yes",
-    "keen",
-    "buying",
-    "available",
-    "want to",
-    "would like",
-    "great",
-    "perfect",
-    "sounds good",
-    "interested in",
-    "positive response",
-  ];
-  return positive.some((p) => s.includes(p));
-}
+export { isPositiveReply } from "./outreach-logic";
 
 /** Marks reply/bounce telemetry onto orders from corpus state changes. */
 export async function syncOrderReplyStates(tenantId: string): Promise<number> {
@@ -850,6 +855,18 @@ export async function syncOrderReplyStates(tenantId: string): Promise<number> {
           where: { tenantId, outreachOrderId: o.id, status: "pending" },
           data: { status: "cancelled" },
         });
+        // Mirror into the conversation thread (deduped; best-effort so sync
+        // keeps working on databases migrated before conversations existed).
+        try {
+          const { recordInboundMessageTx } = await import("./conversations");
+          await recordInboundMessageTx(tx, tenantId, {
+            leadKey: o.leadKey, email: o.email, businessName: o.businessName,
+            kind: "unsubscribe", body: "Recipient unsubscribed (corpus sync)",
+            providerMsgId: `sync:${o.id}:unsub`,
+          }, "corpus_reply_sync");
+        } catch {
+          // conversation mirror is additive — never fail the sync for it
+        }
         continue;
       }
       const replied =
@@ -877,6 +894,16 @@ export async function syncOrderReplyStates(tenantId: string): Promise<number> {
             `prospect:${o.id}:${reply.toLowerCase()}`.slice(0, 200),
           );
         }
+        try {
+          const { recordInboundMessageTx } = await import("./conversations");
+          await recordInboundMessageTx(tx, tenantId, {
+            leadKey: o.leadKey, email: o.email, businessName: o.businessName,
+            kind: "reply", body: reply.slice(0, 4000),
+            providerMsgId: `sync:${o.id}:${reply.toLowerCase()}`.slice(0, 200),
+          }, "corpus_reply_sync");
+        } catch {
+          // conversation mirror is additive — never fail the sync for it
+        }
       }
       if (lead.bounced === 1) {
         await tx.outreachOrder.update({ where: { id: o.id }, data: { deliveryStatus: "bounced" } });
@@ -885,6 +912,16 @@ export async function syncOrderReplyStates(tenantId: string): Promise<number> {
           where: { tenantId, outreachOrderId: o.id, status: "pending" },
           data: { status: "cancelled" },
         });
+        try {
+          const { recordInboundMessageTx } = await import("./conversations");
+          await recordInboundMessageTx(tx, tenantId, {
+            leadKey: o.leadKey, email: o.email, businessName: o.businessName,
+            kind: "bounce", body: "Delivery bounced (corpus sync)",
+            providerMsgId: `sync:${o.id}:bounce`,
+          }, "corpus_reply_sync");
+        } catch {
+          // conversation mirror is additive — never fail the sync for it
+        }
         updated += 1;
       }
     }

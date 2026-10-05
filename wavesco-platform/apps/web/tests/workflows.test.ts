@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/wavesco/control", () => ({
+  acquisitionDenied: vi.fn(async () => null),
   requireControlAuth: vi.fn(async () => {
     throw new Error("UNAUTHORIZED");
   }),
@@ -16,7 +17,7 @@ describe("GET /api/acquisition/workflows", () => {
     const { requireControlAuth } = await import("@/lib/wavesco/control");
     vi.mocked(requireControlAuth).mockRejectedValueOnce(new Error("UNAUTHORIZED"));
     const { GET } = await import("@/app/api/acquisition/workflows/route");
-    const res = await GET(new Request("http://test"));
+    const res = await GET();
     expect(res.status).toBe(401);
   });
 });
@@ -32,7 +33,7 @@ describe("n8n missing", () => {
     const { requireControlAuth } = await import("@/lib/wavesco/control");
     vi.mocked(requireControlAuth).mockResolvedValueOnce({ tenantId: "t1", userId: "u1", session: {} } as any);
     const { GET } = await import("@/app/api/acquisition/workflows/route");
-    const res = await GET(new Request("http://test"));
+    const res = await GET();
     expect(res.status).toBe(200);
     const json: any = await res.json();
     expect(json.status).toBe("BLOCKED");

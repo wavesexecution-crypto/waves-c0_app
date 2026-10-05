@@ -73,37 +73,37 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href="/acquisition/campaigns" className="text-xs text-muted-foreground hover:underline">
+          <Link href="/acquisition/campaigns" className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground hover:text-foreground hover:underline">
             ← Campaigns
           </Link>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{campaign.name}</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="mt-1 font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">{campaign.name}</h1>
+          <p className="mt-1 font-mono text-[11px] leading-5 tracking-[0.02em] text-muted-foreground">
             {[campaign.location ?? "all locations", campaign.category ?? "all categories", campaign.tier ? `tier ${campaign.tier}` : "all tiers"].join(" · ")}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Created {formatIST(campaign.createdAt)} · ID {campaign.id}</p>
+          <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Created {formatIST(campaign.createdAt)} · ID <span className="tabular-nums">{campaign.id}</span></p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <AutoRefresh intervalMs={5_000} />
           <StatusPill state={pillState(campaign.status)} />
-          <span className="rounded-full border px-2 py-0.5 text-xs font-mono uppercase">{campaign.status === "running" ? "● running" : campaign.status}</span>
+          <span className="rounded-full border border-border/80 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{campaign.status === "running" ? "● running" : campaign.status}</span>
         </div>
       </div>
 
       {/* State machine visual */}
-      <div className="rounded-lg border bg-card p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">State machine</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          draft → <strong>launch</strong> → scheduled → running ↔ paused → <strong>stop</strong> → stopped
+      <div className="rounded-lg border border-border/80 bg-card p-4">
+        <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">State machine</h2>
+        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
+          draft → <strong className="font-medium text-foreground">launch</strong> → scheduled → running ↔ paused → <strong className="font-medium text-foreground">stop</strong> → stopped
         </p>
         <div className="mt-3">
           <CampaignControls campaignId={campaign.id} status={campaign.status} campaignName={campaign.name} />
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full border px-2 py-1">Configure: edit via DB or recreate</span>
-          <Link href="#monitor" className="rounded-full border px-2 py-1 hover:bg-accent">
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="rounded-full border border-border/80 px-2 py-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Configure: edit via DB or recreate</span>
+          <Link href="#monitor" className="rounded-full border border-border/80 px-2 py-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground hover:bg-muted/50 hover:text-foreground">
             Monitor
           </Link>
-          <Link href="#analyze" className="rounded-full border px-2 py-1 hover:bg-accent">
+          <Link href="#analyze" className="rounded-full border border-border/80 px-2 py-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground hover:bg-muted/50 hover:text-foreground">
             Analyze
           </Link>
         </div>
@@ -111,88 +111,88 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
       {/* Monitor */}
       <section id="monitor" className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border bg-card p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Monitor</h2>
-          <div className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between border-b py-1.5">
-              <span className="text-muted-foreground">Eligible now (live corpus)</span>
-              <strong className="tabular-nums">{eligibleNow < 0 ? "engine unavailable" : eligibleNow}</strong>
+        <div className="rounded-lg border border-border/80 bg-card p-4">
+          <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Monitor</h2>
+          <div className="mt-3 space-y-2">
+            <div className="flex justify-between border-b border-border/60 py-1.5">
+              <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Eligible now (live corpus)</span>
+              <strong className="font-mono text-[11px] tabular-nums tracking-[0.02em] text-foreground">{eligibleNow < 0 ? "engine unavailable" : eligibleNow}</strong>
             </div>
-            <div className="flex justify-between border-b py-1.5">
-              <span className="text-muted-foreground">Sending limit</span>
-              <span className="tabular-nums">{campaign.sendingLimit ?? "no cap"}</span>
+            <div className="flex justify-between border-b border-border/60 py-1.5">
+              <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Sending limit</span>
+              <span className="font-mono text-[11px] tabular-nums tracking-[0.02em] text-foreground">{campaign.sendingLimit ?? "no cap"}</span>
             </div>
-            <div className="flex justify-between border-b py-1.5">
-              <span className="text-muted-foreground">Queued</span>
-              <span className="tabular-nums">{metrics.queued}</span>
+            <div className="flex justify-between border-b border-border/60 py-1.5">
+              <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Queued</span>
+              <span className="font-mono text-[11px] tabular-nums tracking-[0.02em] text-foreground">{metrics.queued}</span>
             </div>
-            <div className="flex justify-between border-b py-1.5">
-              <span className="text-muted-foreground">Scheduled for</span>
-              <span>{campaign.scheduledFor ? formatIST(campaign.scheduledFor) : "—"}</span>
+            <div className="flex justify-between border-b border-border/60 py-1.5">
+              <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Scheduled for</span>
+              <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{campaign.scheduledFor ? formatIST(campaign.scheduledFor) : "—"}</span>
             </div>
             <div className="pt-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">eligibleSnapshot (captured at queue time)</p>
+              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">eligibleSnapshot (captured at queue time)</p>
               {snapshot ? (
-                <pre className="mt-1 max-h-48 overflow-auto rounded-md border bg-muted/30 p-2 text-xs">{JSON.stringify(snapshot, null, 2)}</pre>
+                <pre className="mt-1 max-h-48 overflow-auto rounded-lg border border-border/80 bg-muted/20 p-2 font-mono text-[11px] leading-5 tracking-[0.02em] text-muted-foreground">{JSON.stringify(snapshot, null, 2)}</pre>
               ) : (
-                <p className="mt-1 text-xs text-muted-foreground">No snapshot — campaign has not been queued yet.</p>
+                <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">No snapshot — campaign has not been queued yet.</p>
               )}
             </div>
           </div>
         </div>
 
         {/* Analyze */}
-        <div id="analyze" className="rounded-lg border bg-card p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Analyze</h2>
+        <div id="analyze" className="rounded-lg border border-border/80 bg-card p-4">
+          <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Analyze</h2>
           <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-lg border p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Sent</p>
-              <p className="text-xl font-semibold tabular-nums">{metrics.sent}</p>
-              <p className="text-[11px] text-muted-foreground">{sentRate}%</p>
+            <div className="rounded-lg border border-border/80 p-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Sent</p>
+              <p className="mt-1 font-mono text-[20px] font-medium tabular-nums tracking-[-0.02em] text-foreground">{metrics.sent}</p>
+              <p className="font-mono text-[11px] tabular-nums tracking-[0.02em] text-muted-foreground">{sentRate}%</p>
             </div>
-            <div className="rounded-lg border p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Failed</p>
-              <p className="text-xl font-semibold tabular-nums">{metrics.failed}</p>
-              <p className="text-[11px] text-muted-foreground">{failedRate}%</p>
+            <div className="rounded-lg border border-border/80 p-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Failed</p>
+              <p className="mt-1 font-mono text-[20px] font-medium tabular-nums tracking-[-0.02em] text-foreground">{metrics.failed}</p>
+              <p className="font-mono text-[11px] tabular-nums tracking-[0.02em] text-muted-foreground">{failedRate}%</p>
             </div>
-            <div className="rounded-lg border p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total</p>
-              <p className="text-xl font-semibold tabular-nums">{metrics.total}</p>
-              <p className="text-[11px] text-muted-foreground">queued + sent + failed</p>
+            <div className="rounded-lg border border-border/80 p-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Total</p>
+              <p className="mt-1 font-mono text-[20px] font-medium tabular-nums tracking-[-0.02em] text-foreground">{metrics.total}</p>
+              <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">queued + sent + failed</p>
             </div>
           </div>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div className="h-full bg-emerald-500" style={{ width: `${sentRate}%` }} />
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">Sent rate vs failed rate across this campaign&apos;s outreach emails.</p>
+          <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Sent rate vs failed rate across this campaign&apos;s outreach emails.</p>
         </div>
       </section>
 
       {/* Recent outreach emails */}
-      <section className="rounded-lg border bg-card p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Outreach emails (campaign)</h2>
+      <section className="rounded-lg border border-border/80 bg-card p-4">
+        <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Outreach emails (campaign)</h2>
         {metrics.emails.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">No outreach emails for this campaign yet. Use the submit panel on the list page or launch to queue.</p>
+          <p className="py-6 text-center font-sans text-[13px] text-muted-foreground">No outreach emails for this campaign yet. Use the submit panel on the list page or launch to queue.</p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="mt-3 overflow-x-auto rounded-lg border border-border/80">
+            <table className="w-full">
               <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2">Business</th>
-                  <th className="px-3 py-2">Recipient</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Sent at</th>
+                <tr className="border-b border-border/60 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Business</th>
+                  <th className="px-3 py-2 font-medium">Recipient</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Sent at</th>
                 </tr>
               </thead>
               <tbody>
                 {metrics.emails.map((e: any) => (
-                  <tr key={e.id} className="border-b last:border-0 hover:bg-accent/40">
-                    <td className="px-3 py-2">{e.business}</td>
-                    <td className="px-3 py-2 font-mono text-xs">{e.email}</td>
+                  <tr key={e.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20">
+                    <td className="px-3 py-2 font-sans text-[13px] text-foreground">{e.business}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] tracking-[-0.01em] text-foreground">{e.email}</td>
                     <td className="px-3 py-2">
                       <StatusPill state={e.status} />
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{e.sentAt ? formatIST(e.sentAt) : "—"}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{e.sentAt ? formatIST(e.sentAt) : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -202,10 +202,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       </section>
 
       <div className="flex gap-2">
-        <Link href="/acquisition/campaigns" className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
+        <Link href="/acquisition/campaigns" className="rounded-lg border border-border/80 bg-card px-3 py-1.5 font-sans text-[13px] text-foreground hover:bg-muted/50">
           Back to campaigns
         </Link>
-        <Link href="/acquisition/outreach" className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
+        <Link href="/acquisition/outreach" className="rounded-lg border border-border/80 bg-card px-3 py-1.5 font-sans text-[13px] text-foreground hover:bg-muted/50">
           Outreach pipeline
         </Link>
       </div>

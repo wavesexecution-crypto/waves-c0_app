@@ -52,7 +52,7 @@ export function WorkflowControls({ workflowId, workflowName, active }: { workflo
           type="button"
           disabled={!!pending}
           onClick={() => doAction("disable")}
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-300"
+          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-300"
         >
           {pending === "disable" ? "Disabling…" : "Disable"}
         </button>
@@ -61,7 +61,7 @@ export function WorkflowControls({ workflowId, workflowName, active }: { workflo
           type="button"
           disabled={!!pending}
           onClick={() => doAction("enable")}
-          className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="rounded-lg bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
         >
           {pending === "enable" ? "Enabling…" : "Enable"}
         </button>
@@ -70,7 +70,7 @@ export function WorkflowControls({ workflowId, workflowName, active }: { workflo
         type="button"
         disabled={!!pending}
         onClick={() => doAction("execute")}
-        className="rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
+        className="rounded-lg border border-border/80 px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
       >
         {pending === "execute" ? "Executing…" : "Execute"}
       </button>
@@ -78,7 +78,7 @@ export function WorkflowControls({ workflowId, workflowName, active }: { workflo
         type="button"
         disabled={!!pending}
         onClick={() => doAction("retry")}
-        className="rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
+        className="rounded-lg border border-border/80 px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
       >
         {pending === "retry" ? "Retrying…" : "Retry failed"}
       </button>
@@ -118,7 +118,7 @@ export function WorkflowHistoryButton({ workflowId }: { workflowId: string }) {
       </button>
       {error ? <span className="text-[11px] text-red-500">{error}</span> : null}
       {open && execs ? (
-        <div className="rounded-md border bg-muted/20 p-2 text-[11px]">
+        <div className="rounded-lg border border-border/80 bg-muted/20 p-2 text-[11px]">
           <div className="mb-1 flex items-center justify-between">
             <span className="font-medium">Last {execs.length} executions</span>
             <button type="button" onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">✕</button>

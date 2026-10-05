@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 import { buildAgentContext } from "@/lib/wavesco/acquisition-profile";
 import { getIntegrationsHealth } from "@/lib/wavesco/integrations";
@@ -16,6 +16,8 @@ function isUnauthorized(e: unknown): boolean {
 export async function GET() {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
 
     const profile = await withTenantContext(tenantId, async (tx: any) => {
       const p = await (tx as any).acquisitionProfile.findFirst({ where: { tenantId } });

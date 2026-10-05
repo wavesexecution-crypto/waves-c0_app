@@ -4,7 +4,12 @@ import { describe, it, expect, vi } from "vitest";
 // Validated via mocked tenant DB + mocked lead-engine to avoid node:sqlite / next-auth load in vitest.
 // BLOCKED handling is exercised deterministically via env deletion branch.
 
-const e2eStore: Record<string, Record<string, unknown>[]> = {
+interface E2eStore {
+  outreachOrder: Record<string, unknown>[];
+  auditLog: Record<string, unknown>[];
+}
+
+const e2eStore: E2eStore = {
   outreachOrder: [],
   auditLog: [],
 };
@@ -26,19 +31,26 @@ vi.mock("@/lib/wavesco/lead-engine", () => ({
 }));
 
 vi.mock("@wavesco/db", () => {
-  const tx = {
+  type Tx = {
+    outreachOrder: { count: () => Promise<number>; create: (args: { data: Record<string, unknown> }) => Promise<Record<string, unknown>> };
+    auditLog: { create: (args: { data: Record<string, unknown> }) => Promise<Record<string, unknown>>; count: () => Promise<number>; findMany: () => Promise<Record<string, unknown>[]> };
+    campaign: { count: () => Promise<number> };
+    leadResearch: { count: () => Promise<number> };
+    generationBatch: { count: () => Promise<number> };
+  };
+  const tx: Tx = {
     outreachOrder: {
       count: async () => e2eStore.outreachOrder.length,
       create: async ({ data }: { data: Record<string, unknown> }) => {
         const row = { id: `order_${Date.now()}`, ...data, status: (data as Record<string, unknown>).status ?? "READY_FOR_APPROVAL" };
-        e2eStore.outreachOrder.push(row as Record<string, unknown>);
+        e2eStore.outreachOrder.push(row);
         return row;
       },
     },
     auditLog: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
         const row = { id: `audit_${Date.now()}`, createdAt: new Date().toISOString(), ...data };
-        e2eStore.auditLog.push(row as Record<string, unknown>);
+        e2eStore.auditLog.push(row);
         return row;
       },
       count: async () => e2eStore.auditLog.length,
@@ -50,7 +62,7 @@ vi.mock("@wavesco/db", () => {
   };
   return {
     prisma: tx,
-    withTenantContext: async (_tid: string, fn: (tx: typeof tx) => Promise<unknown>) => fn(tx),
+    withTenantContext: async (_tid: string, fn: (inner: Tx) => Promise<unknown>) => fn(tx),
   };
 });
 
@@ -153,8 +165,9 @@ describe("e2e acquisition flow", () => {
       delete process.env.LEAD_ENGINE_ROOT;
       process.env.LEAD_ENGINE_MODE = "remote";
       delete process.env.LEAD_ENGINE_API_URL;
-      const hasEngineRoot = Boolean(process.env.LEAD_ENGINE_ROOT && process.env.LEAD_ENGINE_ROOT.trim() !== "");
-      const hasRemoteUrl = Boolean(process.env.LEAD_ENGINE_API_URL && process.env.LEAD_ENGINE_API_URL.trim() !== "");
+      const env = process.env as Record<string, string | undefined>;
+      const hasEngineRoot = typeof env.LEAD_ENGINE_ROOT === "string" && env.LEAD_ENGINE_ROOT.trim() !== "";
+      const hasRemoteUrl = typeof env.LEAD_ENGINE_API_URL === "string" && env.LEAD_ENGINE_API_URL.trim() !== "";
       const blocked = !hasEngineRoot && !hasRemoteUrl;
       expect(blocked).toBe(true);
     } finally {

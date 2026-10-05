@@ -310,13 +310,18 @@ export function maskUrl(url: string | null | undefined): string | null {
 }
 
 export function redactSecrets<T>(obj: T): T {
-  // shallow redact known secret keys; profile never stores raw keys, but guard
+  // Deep redact of known secret keys at any nesting depth (including inside
+  // arrays). Profile JSON blobs are user-supplied and arbitrarily nested —
+  // a shallow pass leaked credentials 3+ levels deep into the database.
   if (!obj || typeof obj !== "object") return obj;
-  const clone: any = Array.isArray(obj) ? [...(obj as any)] : { ...(obj as any) };
+  if (Array.isArray(obj)) return obj.map((v) => redactSecrets(v)) as unknown as T;
+  const clone: any = { ...(obj as any) };
   const secretKeys = ["api_key", "apiKey", "secret", "token", "password", "credentialRef", "credential", "DATABASE_URL", "DIRECT_URL"];
   for (const k of Object.keys(clone)) {
     if (secretKeys.some((s) => k.toLowerCase().includes(s.toLowerCase()))) {
       clone[k] = "***";
+    } else if (clone[k] && typeof clone[k] === "object") {
+      clone[k] = redactSecrets(clone[k]);
     }
   }
   return clone;

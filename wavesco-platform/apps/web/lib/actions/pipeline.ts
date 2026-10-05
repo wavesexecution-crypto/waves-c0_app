@@ -155,9 +155,18 @@ export async function decideOrderAction(
   if (!parsed.success) return { ok: false, error: "Invalid decision request." };
 
   const res = await decideOrderApproval(user.tenantId, parsed.data.orderId, parsed.data.decision);
-  if (!res.ok) return { ok: false, error: res.error };
+  // `pending_reconciliation` means the decision SUCCEEDED and the provider has
+  // not written its execution record yet. Reporting that as an error painted a
+  // successful approval in red and left the client retrying forever.
+  if (!res.ok && res.deliveryStatus !== "pending_reconciliation") return { ok: false, error: res.error };
 
   revalidatePipeline();
+  if (!res.ok) {
+    return {
+      ok: true,
+      message: "Approved. Waiting for the email provider to confirm dispatch — this page will update on the next refresh.",
+    };
+  }
   return res.sent
     ? { ok: true, message: "Approved and dispatched through the existing Email Outbox." }
     : { ok: true, message: `Decision applied (${res.deliveryStatus ?? parsed.data.decision}).` };
@@ -199,9 +208,13 @@ async function finishBatch(
     metadata: { ...counts },
     sourceKey: `pipeline-batch:${label}:${new Date().toISOString().slice(0, 16)}`,
   });
-  // Real transition: the cycle-level batch summary/report is finalized.
-  onCycleReportReady(tenantId, undefined, {}, undefined, `batch-summary:${label}`);
-  return { ...counts, telegram: telegram.ok ? telegram.delivered ?? "accepted" : `failed: ${telegram.error}`, obsidian };
+  // Real transition: the batch summary is finalised. This previously claimed a
+  // "Cycle 1 Report" was ready — fired by every batch button, even when zero
+  // leads were processed, and pointing at a route that does not exist.
+  if ((counts.processed ?? 0) > 0 || (counts.ordersCreated ?? 0) > 0) {
+    onCycleReportReady(tenantId, undefined, {}, undefined, `batch-summary:${label}`);
+  }
+  return { ...counts, telegram: telegram.ok ? telegram.delivered ?? "accepted" : "not delivered", obsidian };
 }
 
 export async function batchResearchAction(): Promise<PipelineActionState> {

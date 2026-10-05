@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { auditControl, requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, auditControl, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,8 @@ export async function POST(req: Request) {
   let userId: string | null | undefined;
   try {
     const auth = await requireControlAuth();
+    const denied = await acquisitionDenied(auth.tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     tenantId = auth.tenantId;
     userId = auth.userId;
   } catch (e) {
@@ -153,41 +155,56 @@ export async function POST(req: Request) {
 
   const requestId = `gen_${randomUUID().replace(/-/g, "").slice(0, 20)}`;
 
+  // Hand off to the ONE code path that actually drives the Lead Engine. Creating
+  // a GenerationBatch row here directly produced a permanent `queued` row that
+  // nothing ever ran, and the Lead Engine page then showed "Engine is running…"
+  // with its primary button disabled forever.
   try {
-    const created: any = await withTenantContext(tenantId, async (tx: any) => {
-      const data: Record<string, unknown> = {
-        tenantId,
-        requestId,
-        params: params as never,
-        status: "queued",
-      };
-      if (count !== undefined) (data as Record<string, unknown>).requestedCount = count;
-      const batch = await tx.generationBatch.create({ data });
-      return batch;
+    // Lazy-loaded: generation.ts reaches node:sqlite through lead-engine.ts,
+    // which must not be pulled into every environment that loads this route.
+    const { startGeneration } = await import("@/lib/wavesco/generation");
+    const started = await startGeneration(tenantId, userId ?? "unknown", {
+      requestedCount: count ?? 10,
+      location: city ?? undefined,
+      category: category ?? undefined,
+      tier: tier && tier !== "all" ? tier : undefined,
     });
+
+    if (!started.ok) {
+      await auditControl({
+        tenantId,
+        userId,
+        action: "document.generate",
+        model: "GenerationBatch",
+        metadata: { requestId, error: started.error, failed: true, params },
+      }).catch(() => undefined);
+      return NextResponse.json(
+        { error: "We could not start the Lead Engine. It may be busy or unreachable — try again shortly." },
+        { status: 502 }
+      );
+    }
 
     await auditControl({
       tenantId,
       userId,
       action: "document.generate",
       model: "GenerationBatch",
-      recordId: created.id,
+      recordId: started.requestId,
       after: { status: "queued", params },
-      metadata: { requestId, params },
+      metadata: { requestId: started.requestId, params },
     });
 
     return NextResponse.json(
       {
-        batchId: created.id,
-        requestId: created.requestId ?? requestId,
-        status: created.status ?? "queued",
+        requestId: started.requestId,
+        status: "queued",
         params,
       },
       { status: 200 }
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    // attempt to audit failure
+    console.error("[documents:generate] start failed", e);
     try {
       await auditControl({
         tenantId,
@@ -197,8 +214,11 @@ export async function POST(req: Request) {
         metadata: { error: msg, failed: true, params },
       });
     } catch {
-      // ignore
+      // best-effort audit
     }
-    return NextResponse.json({ error: "internal", detail: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: "We could not start the Lead Engine. Try again in a moment." },
+      { status: 500 }
+    );
   }
 }

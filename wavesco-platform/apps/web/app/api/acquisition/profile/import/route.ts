@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireControlAuth, auditControl } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth, auditControl } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,8 @@ function isUnauthorized(e: unknown): boolean {
 export async function POST(req: Request) {
   try {
     const { tenantId, userId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const body = await req.json().catch(() => ({}));
     const { fileName, fileType, rowCount, summary } = body as any;
 
@@ -84,6 +86,8 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const url = new URL(req.url);
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || "10"), 1), 50);
     const imports = await withTenantContext(tenantId, async (tx: any) => {

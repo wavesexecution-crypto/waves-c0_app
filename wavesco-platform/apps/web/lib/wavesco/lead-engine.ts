@@ -266,7 +266,7 @@ export async function getLeadStats(): Promise<LeadStats> {
       ),
       emailReady: one(
         "SELECT count(*) FROM leads WHERE email IS NOT NULL AND TRIM(email)<>'' "
-        + "AND UPPER(COALESCE(email_status,'')) LIKE '%VERIFIED%' "
+        + "AND UPPER(TRIM(COALESCE(email_status,''))) = 'VERIFIED' "
         + "AND COALESCE(opted_out,0)=0 AND date_contacted IS NULL",
       ),
       contacted: one("SELECT count(*) FROM leads WHERE date_contacted IS NOT NULL"),
@@ -593,7 +593,7 @@ export async function selectCampaignCandidates(
     const q = new URLSearchParams();
     if (filters.location) q.set("location", filters.location);
     if (filters.category) q.set("category", filters.category);
-    if (filters.tier) q.set("tier", filters.tier);
+    if (filters.tier && filters.tier !== "all") q.set("tier", filters.tier);
     const j = await apiGet<ApiCandidatesResponse>(`/candidates?${q.toString()}`);
     return j.candidates;
   }
@@ -617,7 +617,7 @@ export async function selectCampaignCandidates(
     const rows = db
       .prepare(
         `SELECT name_key,business,email,
-           CASE WHEN UPPER(COALESCE(email_status,'')) LIKE '%VERIFIED%' THEN 1 ELSE 0 END AS verified,
+           CASE WHEN UPPER(TRIM(COALESCE(email_status,''))) = 'VERIFIED' THEN 1 ELSE 0 END AS verified,
            CASE WHEN date_contacted IS NOT NULL THEN 1 ELSE 0 END AS contacted,
            COALESCE(opted_out,0) AS opted_out,
            COALESCE(bounced,0) AS bounced,

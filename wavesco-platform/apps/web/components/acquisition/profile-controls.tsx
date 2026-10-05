@@ -45,35 +45,35 @@ export function ProfileLifecycleControls({ status, ready }: { status: string; re
         <button
           onClick={() => act("activate")}
           disabled={busy !== null || !ready}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium disabled:opacity-50"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-sans text-[13px] font-medium disabled:opacity-50"
         >
           {busy === "activate" ? "Activating…" : "Activate — Rent & Operate"}
         </button>
       )}
       {status === "ACTIVE" && (
         <>
-          <button onClick={() => act("pause")} disabled={busy !== null} className="px-4 py-2 border rounded-md text-sm">
+          <button onClick={() => act("pause")} disabled={busy !== null} className="px-4 py-2 border rounded-lg font-sans text-[13px]">
             {busy === "pause" ? "Pausing…" : "Pause"}
           </button>
-          <button onClick={() => act("suspend")} disabled={busy !== null} className="px-4 py-2 border rounded-md text-sm">
+          <button onClick={() => act("suspend")} disabled={busy !== null} className="px-4 py-2 border rounded-lg font-sans text-[13px]">
             {busy === "suspend" ? "Suspending…" : "Suspend"}
           </button>
         </>
       )}
       {status === "PAUSED" && (
         <>
-          <button onClick={() => act("resume")} disabled={busy !== null || !ready} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm">
+          <button onClick={() => act("resume")} disabled={busy !== null || !ready} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-sans text-[13px]">
             {busy === "resume" ? "Resuming…" : "Resume"}
           </button>
-          <button onClick={() => act("suspend")} disabled={busy !== null} className="px-4 py-2 border rounded-md text-sm">
+          <button onClick={() => act("suspend")} disabled={busy !== null} className="px-4 py-2 border rounded-lg font-sans text-[13px]">
             Suspend
           </button>
         </>
       )}
       {["DRAFT", "INCOMPLETE"].includes(status) && !ready && (
-        <span className="text-sm text-muted-foreground">Complete required fields to activate</span>
+        <span className="font-sans text-[13px] text-muted-foreground">Complete required fields to activate</span>
       )}
-      {msg && <span className="text-sm text-muted-foreground ml-2">{msg}</span>}
+      {msg && <span className="font-sans text-[13px] text-muted-foreground ml-2">{msg}</span>}
     </div>
   );
 }
@@ -166,7 +166,7 @@ export function ProfileQuickForm({
                 onChange={(e) => setValues((s) => ({ ...s, [f.key]: e.target.value }))}
                 placeholder={f.placeholder}
                 rows={3}
-                className="border rounded-md px-3 py-2 text-sm bg-background"
+                className="border rounded-lg px-3 py-2 font-sans text-[13px] bg-background"
               />
             ) : (
               <input
@@ -174,18 +174,18 @@ export function ProfileQuickForm({
                 value={values[f.key] || ""}
                 onChange={(e) => setValues((s) => ({ ...s, [f.key]: e.target.value }))}
                 placeholder={f.placeholder}
-                className="border rounded-md px-3 py-2 text-sm bg-background"
+                className="border rounded-lg px-3 py-2 font-sans text-[13px] bg-background"
               />
             )}
           </label>
         ))}
       </div>
       <div className="flex items-center gap-2">
-        <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm disabled:opacity-50">
+        <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg font-sans text-[13px] disabled:opacity-50">
           {saving ? "Saving…" : "Save"}
         </button>
-        {ok && <span className="text-sm text-green-600">Saved</span>}
-        {err && <span className="text-sm text-destructive">{err}</span>}
+        {ok && <span className="font-sans text-[13px] text-green-600">Saved</span>}
+        {err && <span className="font-sans text-[13px] text-destructive">{err}</span>}
       </div>
     </div>
   );
@@ -196,25 +196,64 @@ export function DataImportControl({ profileId }: { profileId?: string | null }) 
   const [fileName, setFileName] = useState("");
   const [fileType, setFileType] = useState("csv");
   const [rowCount, setRowCount] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function submit() {
+    if (file) {
+      await submitWithUpload();
+      return;
+    }
     if (!fileName.trim()) {
-      setMsg("File name required");
+      setMsg("Choose a file to upload, or enter a file name to record a metadata-only import.");
       return;
     }
     setBusy(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/acquisition/profile/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: fileName.trim(), fileType, rowCount: rowCount ? Number(rowCount) : undefined, summary: { uploadedAt: new Date().toISOString() } }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j.error || "Import failed");
-      setMsg(`✓ Recorded ${j.import?.fileName}`);
+      await recordImport(fileName.trim(), fileType, rowCount ? Number(rowCount) : undefined, null);
+      setMsg(`✓ Recorded ${fileName.trim()}`);
+      router.refresh();
+    } catch (e) {
+      setMsg(`✗ ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recordImport(name: string, type: string, rows: number | undefined, objectId: string | null) {
+    const res = await fetch("/api/acquisition/profile/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: name, fileType: type,
+        rowCount: rows,
+        summary: { uploadedAt: new Date().toISOString(), ...(objectId ? { objectId } : { bytesStored: false }) },
+      }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || "Import failed");
+    return j;
+  }
+
+  async function submitWithUpload() {
+    if (!file) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("purpose", "data-import");
+      const up = await fetch("/api/acquisition/storage/objects", { method: "POST", body: form });
+      const uj = await up.json().catch(() => ({}));
+      if (!up.ok) throw new Error(uj.reason || uj.error || `Upload failed (${up.status})`);
+      const ext = (file.name.split(".").pop() ?? "csv").toLowerCase();
+      const type = ext === "xlsx" ? "excel" : ext === "json" ? "json" : "csv";
+      await recordImport(file.name, type, undefined, uj.objectId ?? null);
+      setMsg(`✓ Uploaded and recorded ${file.name} (${uj.sizeBytes ?? "?"} bytes)`);
+      setFile(null);
+      setFileName("");
       router.refresh();
     } catch (e) {
       setMsg(`✗ ${e instanceof Error ? e.message : String(e)}`);
@@ -226,21 +265,25 @@ export function DataImportControl({ profileId }: { profileId?: string | null }) 
   return (
     <div className="border rounded-lg p-4 bg-card space-y-3">
       <h4 className="font-medium">Existing acquisition data</h4>
-      <p className="text-xs text-muted-foreground">Record CSV/Excel/CRM imports. Actual file bytes go via your storage; this logs the import for the brief (audited).</p>
+      <p className="font-sans text-[13px] leading-5 text-muted-foreground">Upload a CSV/XLSX/JSON file (stored durably, max 10 MB) — or record a metadata-only import. Uploads are validated and tenant-isolated.</p>
       <div className="grid gap-2 md:grid-cols-3">
-        <input value={fileName} onChange={(e) => setFileName(e.target.value)} placeholder="leads-2026-09-02.csv" className="border rounded-md px-3 py-2 text-sm bg-background" />
-        <select value={fileType} onChange={(e) => setFileType(e.target.value)} className="border rounded-md px-3 py-2 text-sm bg-background">
-          <option value="csv">csv</option>
-          <option value="excel">excel</option>
-          <option value="json">json</option>
-        </select>
-        <input value={rowCount} onChange={(e) => setRowCount(e.target.value)} placeholder="rows (e.g. 342)" type="number" className="border rounded-md px-3 py-2 text-sm bg-background" />
+        <input type="file" accept=".csv,.xlsx,.json" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); if (f) setFileName(f.name); }} className="border rounded-lg px-3 py-2 font-sans text-[13px] bg-background md:col-span-1" />
+        <input value={fileName} onChange={(e) => setFileName(e.target.value)} placeholder="leads-2026-09-02.csv" className="border rounded-lg px-3 py-2 font-sans text-[13px] bg-background" />
+        <div className="flex gap-2">
+          <select value={fileType} onChange={(e) => setFileType(e.target.value)} className="border rounded-lg px-3 py-2 font-sans text-[13px] bg-background">
+            <option value="csv">csv</option>
+            <option value="excel">excel</option>
+            <option value="json">json</option>
+          </select>
+          <input value={rowCount} onChange={(e) => setRowCount(e.target.value)} placeholder="rows" type="number" className="border rounded-lg px-3 py-2 font-sans text-[13px] bg-background w-24" />
+        </div>
       </div>
-      <button onClick={submit} disabled={busy} className="px-3 py-1.5 border rounded-md text-sm disabled:opacity-50">
-        {busy ? "Recording…" : "Record import"}
+      {file && <p className="font-sans text-[13px] leading-5 text-muted-foreground">Selected: {file.name} ({file.size.toLocaleString()} bytes) — will upload on submit.</p>}
+      <button onClick={submit} disabled={busy} className="px-3 py-1.5 border rounded-lg font-sans text-[13px] disabled:opacity-50">
+        {busy ? "Working…" : file ? "Upload & record import" : "Record import"}
       </button>
-      {msg && <div className="text-sm text-muted-foreground">{msg}</div>}
-      {profileId && <div className="text-xs text-muted-foreground">Profile: {profileId.slice(0, 8)}… tenant-isolated</div>}
+      {msg && <div className="font-sans text-[13px] text-muted-foreground">{msg}</div>}
+      {profileId && <div className="font-sans text-[13px] leading-5 text-muted-foreground">Profile: {profileId.slice(0, 8)}… tenant-isolated</div>}
     </div>
   );
 }

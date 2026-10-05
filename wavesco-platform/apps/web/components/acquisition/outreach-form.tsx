@@ -23,16 +23,16 @@ export function LeadOutreachForm({
   const [state, formAction, pending] = useActionState(updateLeadOutreachAction, initial);
 
   return (
-    <form action={formAction} className="rounded-lg border bg-card p-4">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+    <form action={formAction} className="rounded-lg border border-border/80 bg-card p-4">
+      <h2 className="mb-3 font-sans text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
         Outreach state · writes back to lead database
       </h2>
       <input type="hidden" name="nameKey" value={nameKey} />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-xs text-muted-foreground">
+        <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Email verification
-          <select name="emailStatus" defaultValue={emailStatus ?? ""} className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm">
+          <select name="emailStatus" defaultValue={emailStatus ?? ""} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
             <option value="">unmarked</option>
             <option value="Verified">Verified</option>
             <option value="Unverified">Unverified</option>
@@ -40,22 +40,22 @@ export function LeadOutreachForm({
           </select>
         </label>
 
-        <label className="text-xs text-muted-foreground">
+        <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Reply status
           <input
             name="replyStatus"
             defaultValue={replyStatus ?? ""}
             placeholder='e.g. "replied — interested"'
-            className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]"
           />
         </label>
 
-        <label className="flex items-center gap-2 pt-4 text-sm">
+        <label className="flex items-center gap-2 pt-4 font-sans text-[13px]">
           <input type="checkbox" name="optedOut" value="true" defaultChecked={optedOut} className="h-4 w-4" />
           Opted out (never email again)
         </label>
 
-        <label className="flex items-center gap-2 pt-4 text-sm">
+        <label className="flex items-center gap-2 pt-4 font-sans text-[13px]">
           <input type="checkbox" name="bounced" value="true" defaultChecked={bounced} className="h-4 w-4" />
           Bounced
         </label>
@@ -66,7 +66,7 @@ export function LeadOutreachForm({
       </p>
 
       <div className="mt-3 flex items-center gap-3">
-        <button type="submit" disabled={pending} className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
+        <button type="submit" disabled={pending} className="rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground disabled:opacity-50">
           {pending ? "Saving…" : "Save to engine DB"}
         </button>
         {state.error ? <span className="text-xs text-red-500">{state.error}</span> : null}

@@ -94,11 +94,11 @@ export default async function AnalyticsPage() {
     sentRate: 0,
     raw: { replies: 0, sent: 0, eligible: 0, contacted: 0 },
   };
-  let workflow: { total: number; byType: Record<string, number>; byState: Record<string, number>; n8nExecutions: number; integrationStatusCount: number; recentEvents: number } = {
+  let workflow: { total: number; byType: Record<string, number>; byState: Record<string, number>; n8nExecutions: number | null; integrationStatusCount: number; recentEvents: number } = {
     total: 0,
     byType: {},
     byState: {},
-    n8nExecutions: 0,
+    n8nExecutions: null as number | null,
     integrationStatusCount: 0,
     recentEvents: 0,
   };
@@ -126,12 +126,12 @@ export default async function AnalyticsPage() {
     byModel: [],
     totalEstimatedCostUsd: 0,
   };
-  let costs: { estimatedCostUsd: number; tokenCostUsd: number; leadCostUsd: number; perLeadCost: number; perTokenCost: number } = {
+  let costs: { estimatedCostUsd: number; tokenCostUsd: number; leadCostUsd: number | null; perLeadCost: number | null; perTokenCost: number | null } = {
     estimatedCostUsd: 0,
     tokenCostUsd: 0,
-    leadCostUsd: 0,
-    perLeadCost: 0.005,
-    perTokenCost: 0.00002,
+    leadCostUsd: null,
+    perLeadCost: null,
+    perTokenCost: null,
   };
   let dbError: string | null = null;
 
@@ -281,7 +281,7 @@ export default async function AnalyticsPage() {
       total: dbData.activityTotal + dbData.integrationCount,
       byType: dbData.activityByType,
       byState: dbData.integrationsByState,
-      n8nExecutions: 0,
+      n8nExecutions: null as number | null,
       integrationStatusCount: dbData.integrationCount,
       recentEvents: dbData.recentEvents,
     };
@@ -362,8 +362,8 @@ export default async function AnalyticsPage() {
       success: v.success,
       failed: v.failed,
     }));
-    const perTokenCost = 0.00002;
-    const effectiveTokenCost = totalEstimatedCost > 0 ? totalEstimatedCost : totalTokens * perTokenCost;
+    // Only recorded spend is reported; no invented per-token rate.
+    const effectiveTokenCost = totalEstimatedCost;
     modelUsage = {
       totalTokens,
       inputTokens: totalInput,
@@ -373,15 +373,16 @@ export default async function AnalyticsPage() {
       byModel,
       totalEstimatedCostUsd: effectiveTokenCost,
     };
-    const perLeadCost = 0.005;
-    const leadCostUsd = acquisition.total * perLeadCost;
+    // The per-lead rate is an internal modelling constant, not a billed figure.
+    const perLeadCost = null;
+    const leadCostUsd = null;
     const tokenCostUsd = effectiveTokenCost;
     costs = {
-      estimatedCostUsd: tokenCostUsd + leadCostUsd,
+      estimatedCostUsd: tokenCostUsd,
       tokenCostUsd,
       leadCostUsd,
       perLeadCost,
-      perTokenCost,
+      perTokenCost: null,
     };
   } catch (e) {
     dbError = e instanceof Error ? e.message : String(e);
@@ -391,20 +392,21 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Analytics — Acquisition OS</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Intelligence</p>
+          <h1 className="mt-1 font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Analytics — Acquisition OS</h1>
+          <p className="mt-1.5 max-w-2xl font-sans text-[13px] leading-5 text-muted-foreground">
             Tenant-scoped acquisition metrics, campaign performance, funnel, response rates, workflow, API usage, model/token usage, system costs.
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
             Tenant {tenantId.slice(0, 8)}… · Acquisition live via getLeadStats (corpus) + tenant DB aggregates. Zeros if empty, not error.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={30_000} />
           <StatusPill state={acquisitionError ? "error" : hasData ? "connected" : "unavailable"} />
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">{acquisitionError ? "ERROR" : hasData ? "LIVE" : "EMPTY"}</span>
+          <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{acquisitionError ? "ERROR" : hasData ? "LIVE" : "EMPTY"}</span>
         </div>
       </div>
 
@@ -412,7 +414,7 @@ export default async function AnalyticsPage() {
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
           <p className="font-medium text-amber-800 dark:text-amber-200">Lead Engine unreachable — acquisition metrics zeroed</p>
           <p className="text-muted-foreground">{acquisitionError.slice(0, 300)}</p>
-          <a href="/acquisition/analytics" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+          <a href="/acquisition/analytics" className="mt-2 inline-block rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
             Retry
           </a>
         </div>
@@ -421,7 +423,7 @@ export default async function AnalyticsPage() {
         <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs">
           <p className="font-medium text-red-600 dark:text-red-400">Tenant DB aggregation warning</p>
           <p className="text-muted-foreground">{dbError.slice(0, 300)}</p>
-          <a href="/acquisition/analytics" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+          <a href="/acquisition/analytics" className="mt-2 inline-block rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
             Retry
           </a>
         </div>
@@ -429,7 +431,7 @@ export default async function AnalyticsPage() {
 
       {/* Acquisition metrics */}
       <section className="space-y-3">
-        <SectionHeader title="Acquisition metrics" subtitle="Corpus (Lead Engine) + tenant DB fallback" right={<span className="text-[11px] text-muted-foreground">{acquisition.lastResearchedAt ? `lastResearched ${new Date(acquisition.lastResearchedAt).toLocaleString()}` : "no lastResearched"}</span>} />
+        <SectionHeader title="Acquisition metrics" subtitle="Corpus (Lead Engine) + tenant DB fallback" right={<span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{acquisition.lastResearchedAt ? `lastResearched ${new Date(acquisition.lastResearchedAt).toLocaleString()}` : "no lastResearched"}</span>} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="Total Leads" value={formatInt(acquisition.total)} detail={`${Object.keys(acquisition.byTier).length} tiers · optedOut ${acquisition.optedOut} · bounced ${acquisition.bounced}`} href="/acquisition/leads" />
           <MetricCard label="Email Ready" value={formatInt(acquisition.emailReady)} detail="VERIFIED + not opted_out + not contacted" href="/acquisition/campaigns" />
@@ -437,8 +439,8 @@ export default async function AnalyticsPage() {
           <MetricCard label="Replies" value={formatInt(acquisition.replies)} detail="reply_status not empty · also OutreachOrder.replyStatus" href="/acquisition/outreach" />
         </div>
         {Object.keys(acquisition.byTier).length > 0 ? (
-          <div className="rounded-lg border bg-card p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">By Tier</p>
+          <div className="rounded-lg border border-border/80 bg-card p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">By Tier</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {Object.entries(acquisition.byTier).map(([tier, count]) => (
                 <span key={tier} className="rounded-full border bg-muted px-2.5 py-1 text-xs font-mono">
@@ -460,8 +462,8 @@ export default async function AnalyticsPage() {
           <MetricCard label="Failed" value={formatInt(campaign.failed)} detail="OutreachEmail failed" />
           <MetricCard label="Replied" value={formatInt(campaign.reply)} detail="OutreachOrder replyStatus not null" />
         </div>
-        <div className="rounded-lg border bg-card p-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Eligible vs Sent vs Reply — bar snapshot</p>
+        <div className="rounded-lg border border-border/80 bg-card p-3">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Eligible vs Sent vs Reply — bar snapshot</p>
           <div className="mt-3 space-y-2">
             {[
               { label: "Eligible", value: campaign.eligible, max: Math.max(campaign.eligible, campaign.sent, campaign.reply, 1), color: "bg-sky-500" },
@@ -477,14 +479,14 @@ export default async function AnalyticsPage() {
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">Bars scaled to max(eligible,sent,reply). Source: tenant campaign + outreachEmail + outreachOrder.</p>
+          <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Bars scaled to max(eligible,sent,reply). Source: tenant campaign + outreachEmail + outreachOrder.</p>
         </div>
       </section>
 
       {/* Lead conversion funnel */}
       <section className="space-y-3">
         <SectionHeader title="Lead conversion funnel" subtitle="Total → Email Ready → Contacted → Replied" />
-        <div className="rounded-lg border bg-card p-4">
+        <div className="rounded-lg border border-border/80 bg-card p-4">
           <div className="space-y-3">
             {funnel.stages.map((s) => (
               <div key={s.label} className="flex items-center gap-3">
@@ -497,7 +499,7 @@ export default async function AnalyticsPage() {
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-muted-foreground">Pct = value / total. Total from getLeadStats, contacted max(engine contacted, sent), replied max(engine replies, orderReplied).</p>
+          <p className="mt-3 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Pct = value / total. Total from getLeadStats, contacted max(engine contacted, sent), replied max(engine replies, orderReplied).</p>
         </div>
       </section>
 
@@ -509,26 +511,26 @@ export default async function AnalyticsPage() {
           <MetricCard label="Sent Rate" value={pct(responseRates.sentRate)} detail={`${responseRates.raw.sent} sent / ${responseRates.raw.eligible} eligible`} />
           <MetricCard label="Coverage" value={`${responseRates.raw.eligible > 0 ? Math.round((responseRates.raw.contacted / responseRates.raw.eligible) * 100) : 0}%`} detail={`${responseRates.raw.contacted} contacted / ${responseRates.raw.eligible} eligible`} />
         </div>
-        <div className="rounded-lg border bg-card p-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Reply rate bar</p>
+        <div className="rounded-lg border border-border/80 bg-card p-3">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Reply rate bar</p>
           <div className="mt-2 h-3 rounded-full bg-muted">
             <div className="h-3 rounded-full bg-violet-500" style={{ width: `${Math.round(responseRates.replyRate * 100)}%` }} />
           </div>
-          <p className="mt-1 text-[11px] text-muted-foreground">Zero if no sends yet — not error. Raw: {JSON.stringify(responseRates.raw)}</p>
+          <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Zero if no sends yet — not error. Raw: {JSON.stringify(responseRates.raw)}</p>
         </div>
       </section>
 
       {/* Workflow performance */}
       <section className="space-y-3">
-        <SectionHeader title="Workflow performance" subtitle="ActivityEvent by type + IntegrationStatus by state · n8n placeholder" />
+        <SectionHeader title="Workflow performance" subtitle="ActivityEvent by type + IntegrationStatus by state" />
         <div className="grid gap-4 sm:grid-cols-3">
           <MetricCard label="Activity Events" value={formatInt(apiUsage.totalEvents)} detail={`${workflow.recentEvents} recent (last 100) · ${Object.keys(workflow.byType).length} types`} />
           <MetricCard label="Integration Checks" value={formatInt(workflow.integrationStatusCount)} detail={`${Object.keys(workflow.byState).length} states`} />
-          <MetricCard label="n8n Executions" value={formatInt(workflow.n8nExecutions)} detail="placeholder — requires live N8N probe" />
+          
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
-          <div className="rounded-lg border bg-card p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">By Activity Type (top 10)</p>
+          <div className="rounded-lg border border-border/80 bg-card p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">By Activity Type (top 10)</p>
             {Object.keys(workflow.byType).length === 0 ? (
               <p className="mt-2 text-xs text-muted-foreground">No activity events yet.</p>
             ) : (
@@ -545,8 +547,8 @@ export default async function AnalyticsPage() {
               </ul>
             )}
           </div>
-          <div className="rounded-lg border bg-card p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">By Integration State</p>
+          <div className="rounded-lg border border-border/80 bg-card p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">By Integration State</p>
             {Object.keys(workflow.byState).length === 0 ? (
               <p className="mt-2 text-xs text-muted-foreground">No integration statuses.</p>
             ) : (
@@ -562,7 +564,7 @@ export default async function AnalyticsPage() {
                 ))}
               </ul>
             )}
-            <p className="mt-2 text-[11px] text-muted-foreground">n8nExecutions placeholder note: requires N8N_BASE_URL execution probe; not fake.</p>
+            
           </div>
         </div>
       </section>
@@ -576,8 +578,8 @@ export default async function AnalyticsPage() {
           <MetricCard label="Generation Batches" value={formatInt(apiUsage.generationBatches)} href="/acquisition/reports" />
           <MetricCard label="Follow-ups Pending" value={formatInt(apiUsage.followUpsPending)} href="/acquisition/follow-ups" />
         </div>
-        <div className="rounded-lg border bg-card p-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Activity by Type (same as workflow)</p>
+        <div className="rounded-lg border border-border/80 bg-card p-3">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Activity by Type (same as workflow)</p>
           {Object.keys(apiUsage.byType).length === 0 ? (
             <p className="mt-2 text-xs text-muted-foreground">No API usage yet — tenant empty.</p>
           ) : (
@@ -594,17 +596,17 @@ export default async function AnalyticsPage() {
 
       {/* Model/token usage */}
       <section className="space-y-3">
-        <SectionHeader title="Model / token usage" subtitle="AiUsageLog — sum group by model, avg latency, counts" right={<span className="text-[11px] text-muted-foreground">{modelUsage.count} logs · {formatInt(modelUsage.totalTokens)} tokens</span>} />
-        <div className="grid gap-4 sm:grid-cols-4">
+        <SectionHeader title="Model / token usage" subtitle="AiUsageLog — sum group by model, avg latency, counts" right={<span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{modelUsage.count} logs · {formatInt(modelUsage.totalTokens)} tokens</span>} />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="Total Tokens" value={formatInt(modelUsage.totalTokens)} detail={`in ${formatInt(modelUsage.inputTokens)} · out ${formatInt(modelUsage.outputTokens)}`} />
           <MetricCard label="Avg Latency" value={modelUsage.avgLatency != null ? `${modelUsage.avgLatency}ms` : "—"} />
           <MetricCard label="Log Count" value={formatInt(modelUsage.count)} />
-          <MetricCard label="Est. Token Cost" value={formatUsd(modelUsage.totalEstimatedCostUsd)} detail={`@ ${costs.perTokenCost}/token`} />
+          <MetricCard label="Est. Token Cost" value={modelUsage.totalEstimatedCostUsd > 0 ? formatUsd(modelUsage.totalEstimatedCostUsd) : "—"} detail={modelUsage.totalEstimatedCostUsd > 0 ? "billed per call" : "no billable usage yet"} />
         </div>
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr className="border-b border-border/60 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 <th className="px-3 py-2">Provider / Model</th>
                 <th className="px-3 py-2">Count</th>
                 <th className="px-3 py-2">Input</th>
@@ -624,7 +626,7 @@ export default async function AnalyticsPage() {
                 </tr>
               ) : (
                 modelUsage.byModel.map((m) => (
-                  <tr key={`${m.provider}:${m.model}`} className="border-b last:border-0 hover:bg-accent/40">
+                  <tr key={`${m.provider}:${m.model}`} className="border-b border-border/60 last:border-0 hover:bg-card-hover">
                     <td className="px-3 py-2 text-xs font-mono">
                       {m.provider} · {m.model}
                     </td>
@@ -638,26 +640,48 @@ export default async function AnalyticsPage() {
                       <span className="mx-1 text-muted-foreground">/</span>
                       <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-red-600 dark:text-red-400">{m.failed}</span>
                     </td>
-                    <td className="px-3 py-2 text-xs tabular-nums">{formatUsd(m.estimatedCostUsd || m.totalTokens * costs.perTokenCost)}</td>
+                    <td className="px-3 py-2 text-xs tabular-nums">{m.estimatedCostUsd > 0 ? formatUsd(m.estimatedCostUsd) : "—"}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-muted-foreground">Source: AiUsageLog (tenant-scoped, last 200) · Sum inputTokens/outputTokens, avg latency, count per model. Cost from estimatedCostUsd when present else totalTokens × {costs.perTokenCost}.</p>
+        <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Source: AiUsageLog (tenant-scoped, last 200) · Sum inputTokens/outputTokens, avg latency, count per model. Cost is the recorded estimatedCostUsd; a dash means nothing was billed for that model.</p>
       </section>
 
       {/* System costs */}
       <section className="space-y-3">
-        <SectionHeader title="System costs" subtitle="Estimate from token counts + lead counts" />
-        <div className="grid gap-4 sm:grid-cols-3">
-          <MetricCard label="Token Cost" value={formatUsd(costs.tokenCostUsd)} detail={`${formatInt(modelUsage.totalTokens)} tokens × ${costs.perTokenCost}`} />
-          <MetricCard label="Lead Cost" value={formatUsd(costs.leadCostUsd)} detail={`${formatInt(acquisition.total)} leads × ${costs.perLeadCost}`} />
-          <MetricCard label="Estimated Total" value={formatUsd(costs.estimatedCostUsd)} detail="token + lead estimate" />
+        <SectionHeader
+          title="System costs"
+          subtitle="Token cost is recorded per call. Lead cost is an internal rate, not a billed figure."
+          right={<span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">rates unconfigured</span>}
+        />
+        {/* Only token cost comes from recorded usage. The per-lead rate is an
+            internal modelling constant, so it is no longer rendered as a
+            dollar figure alongside real spend. */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <MetricCard
+            label="Recorded Token Cost"
+            value={modelUsage.totalEstimatedCostUsd > 0 ? formatUsd(modelUsage.totalEstimatedCostUsd) : "—"}
+            detail={
+              modelUsage.totalEstimatedCostUsd > 0
+                ? `${formatInt(modelUsage.totalTokens)} tokens billed`
+                : "No billable AI usage recorded yet"
+            }
+          />
+          <MetricCard
+            label="Per-lead cost"
+            value="—"
+            detail="Not a billed figure — lead research runs on Waves infrastructure"
+          />
         </div>
-        <div className="rounded-lg border bg-card p-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Cost bar breakdown</p>
+        <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
+          Token cost is the sum of <code className="font-mono">estimatedCostUsd</code> on your AiUsageLog entries.
+          Cost per lead is an internal rate used for planning only and is never charged to your account.
+        </p>
+        <div className="rounded-lg border border-border/80 bg-card p-3">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Cost bar breakdown</p>
           <div className="mt-2 space-y-2">
             <div className="flex items-center gap-3">
               <span className="w-24 text-xs">Token</span>
@@ -666,20 +690,15 @@ export default async function AnalyticsPage() {
               </div>
               <span className="w-24 text-right text-xs tabular-nums">{formatUsd(costs.tokenCostUsd)}</span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="w-24 text-xs">Lead</span>
-              <div className="h-3 flex-1 rounded-full bg-muted">
-                <div className="h-3 rounded-full bg-amber-500" style={{ width: `${costs.estimatedCostUsd > 0 ? Math.round((costs.leadCostUsd / costs.estimatedCostUsd) * 100) : 0}%` }} />
-              </div>
-              <span className="w-24 text-right text-xs tabular-nums">{formatUsd(costs.leadCostUsd)}</span>
-            </div>
+            <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
+              Recorded AI spend only. Lead research runs on Waves infrastructure and is not billed per lead.
+            </p>
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">Cost figures are estimates based on Waves' current usage rates and may vary slightly. Periods without AI activity show no cost.</p>
         </div>
       </section>
 
-      <p className="text-[11px] text-muted-foreground">
-                All metrics reflect your workspace's actual activity. Metrics show zero until your first campaigns run.</p>
+      <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
+        All metrics reflect your workspace's actual activity. Metrics show zero until your first campaigns run.</p>
     </div>
   );
 }

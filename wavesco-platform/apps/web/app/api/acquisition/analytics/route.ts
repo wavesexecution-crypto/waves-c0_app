@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,8 @@ export async function GET(_request?: Request) {
   let tenantId: string;
   try {
     const auth = await requireControlAuth();
+    const denied = await acquisitionDenied(auth.tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     tenantId = auth.tenantId;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -97,7 +99,7 @@ export async function GET(_request?: Request) {
     total: number;
     byType: Record<string, number>;
     byState: Record<string, number>;
-    n8nExecutions: number;
+    n8nExecutions: number | null;
     integrationStatusCount: number;
     recentEvents: number;
     note: string;
@@ -105,10 +107,10 @@ export async function GET(_request?: Request) {
     total: 0,
     byType: {},
     byState: {},
-    n8nExecutions: 0,
+    n8nExecutions: null,
     integrationStatusCount: 0,
     recentEvents: 0,
-    note: "n8n executions placeholder — not available without N8N_BASE_URL execution probe",
+      note: "Counts come from IntegrationStatus + ActivityEvent. n8n execution counts are not probed.",
   };
 
   let apiUsage: {
@@ -157,17 +159,17 @@ export async function GET(_request?: Request) {
   let costs: {
     estimatedCostUsd: number;
     tokenCostUsd: number;
-    leadCostUsd: number;
-    perLeadCost: number;
-    perTokenCost: number;
-    breakdown: { tokenCost: number; leadCost: number; total: number };
+    leadCostUsd: number | null;
+    perLeadCost: number | null;
+    perTokenCost: number | null;
+    breakdown: { tokenCost: number; leadCost: number | null; total: number };
   } = {
     estimatedCostUsd: 0,
     tokenCostUsd: 0,
-    leadCostUsd: 0,
-    perLeadCost: 0.005,
-    perTokenCost: 0.00002,
-    breakdown: { tokenCost: 0, leadCost: 0, total: 0 },
+    leadCostUsd: null,
+    perLeadCost: null,
+    perTokenCost: null,
+    breakdown: { tokenCost: 0, leadCost: null, total: 0 },
   };
 
   let tenantDbError: string | null = null;
@@ -420,10 +422,10 @@ export async function GET(_request?: Request) {
       total: dbData.activityTotal + dbData.integrationCount,
       byType: dbData.activityByType,
       byState: dbData.integrationsByState,
-      n8nExecutions: 0,
+      n8nExecutions: null,
       integrationStatusCount: dbData.integrationCount,
       recentEvents: dbData.recentEvents,
-      note: "n8n executions placeholder — requires N8N_BASE_URL live probe; counts from IntegrationStatus + ActivityEvent",
+      note: "Counts come from IntegrationStatus + ActivityEvent. n8n execution counts are not probed.",
     };
 
     // apiUsage
@@ -522,11 +524,9 @@ export async function GET(_request?: Request) {
       failed: v.failed,
     }));
 
-    // if no estimatedCostUsd but tokens present, estimate via per token cost
-    const perTokenCost = 0.00002;
-    let tokenCostEstimate = totalTokens * perTokenCost;
-    // use recorded cost if present, else estimate
-    const effectiveTokenCost = totalEstimatedCost > 0 ? totalEstimatedCost : tokenCostEstimate;
+    // Only recorded spend is reported. Inventing a per-token rate produced
+    // dollar figures that were pure arithmetic on a made-up number.
+    const effectiveTokenCost = totalEstimatedCost;
 
     modelUsage = {
       totalTokens,
@@ -538,19 +538,20 @@ export async function GET(_request?: Request) {
       totalEstimatedCostUsd: effectiveTokenCost,
     };
 
-    // costs — estimate from tokens + leads
-    const perLeadCost = 0.005; // $0.005 per lead as placeholder
-    const leadCostUsd = acquisition.total * perLeadCost;
+    // Costs: recorded token spend only. The per-lead rate is an internal
+    // modelling constant, not a billed figure, so it is reported as null.
+    const perLeadCost = null;
+    const leadCostUsd = null;
     const tokenCostUsd = effectiveTokenCost;
-    const estimatedCostUsd = tokenCostUsd + leadCostUsd;
+    const estimatedCostUsd = tokenCostUsd;
 
     costs = {
       estimatedCostUsd,
       tokenCostUsd,
       leadCostUsd,
       perLeadCost,
-      perTokenCost,
-      breakdown: { tokenCost: tokenCostUsd, leadCost: leadCostUsd, total: estimatedCostUsd },
+      perTokenCost: null,
+      breakdown: { tokenCost: tokenCostUsd, leadCost: null, total: estimatedCostUsd },
     };
   } catch (e) {
     tenantDbError = e instanceof Error ? e.message : String(e);

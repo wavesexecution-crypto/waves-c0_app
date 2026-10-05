@@ -8,7 +8,7 @@ import { withTenantContext } from "@wavesco/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { recordActivity } from "@/lib/wavesco/activity";
-import { getBatchManifest } from "@/lib/wavesco/lead-engine";
+import { fetchManifestFile, getBatchManifest, leadEngineMode } from "@/lib/wavesco/lead-engine";
 import { n8nBaseUrl } from "@/lib/wavesco/n8n";
 
 async function requireUser(): Promise<{ tenantId: string; userId: string; role: string }> {
@@ -56,18 +56,36 @@ export async function createFollowUpAction(
   if (!parsed.success || Number.isNaN(new Date(parsed.data.dueAt).getTime())) {
     return { ok: false, error: "Business name and a valid due date are required." };
   }
+  const dueAt = new Date(parsed.data.dueAt);
+  if (dueAt.getTime() < Date.now() - 60_000) {
+    return { ok: false, error: "Due date must be in the future — past follow-ups cannot be scheduled." };
+  }
 
-  await withTenantContext(user.tenantId, async (tx) => {
-    await tx.followUp.create({
+  const created = await withTenantContext(user.tenantId, async (tx) => {
+    // Idempotent double-submit: an identical pending follow-up already
+    // exists → return it instead of duplicating.
+    const dupe = await tx.followUp.findFirst({
+      where: {
+        tenantId: user.tenantId,
+        business: parsed.data.business,
+        leadKey: parsed.data.leadKey ?? null,
+        dueAt,
+        status: "pending",
+      },
+      select: { id: true },
+    });
+    if (dupe) return { id: dupe.id, duplicate: true as const };
+    const row = await tx.followUp.create({
       data: {
         tenantId: user.tenantId,
         business: parsed.data.business,
         leadKey: parsed.data.leadKey,
-        dueAt: new Date(parsed.data.dueAt),
+        dueAt,
         note: parsed.data.note,
         status: "pending",
       },
     });
+    return { id: row.id, duplicate: false as const };
   });
 
   await recordActivity(user.tenantId, {
@@ -78,7 +96,10 @@ export async function createFollowUpAction(
   });
   revalidatePath("/acquisition/follow-ups");
   revalidatePath("/command");
-  return { ok: true, message: "Follow-up created." };
+  // Always report what actually happened. A duplicate submit created nothing.
+  return created.duplicate
+    ? { ok: true, message: "That follow-up already exists — no duplicate created." }
+    : { ok: true, message: "Follow-up scheduled." };
 }
 
 const completeSchema = z.object({
@@ -100,15 +121,29 @@ export async function updateFollowUpStatusAction(
   });
   if (!parsed.success) return { ok: false, error: "Invalid request." };
 
-  await withTenantContext(user.tenantId, async (tx) => {
-    await tx.followUp.updateMany({
-      where: { id: parsed.data.followUpId, tenantId: user.tenantId },
+  // updateMany reports how many rows actually changed. Discarding it made a
+  // no-op (stale id, already-closed follow-up) report success.
+  const changed = await withTenantContext(user.tenantId, async (tx) => {
+    const res = await tx.followUp.updateMany({
+      where: {
+        id: parsed.data.followUpId,
+        tenantId: user.tenantId,
+        status: "pending",
+      },
       data:
         parsed.data.action === "done"
           ? { status: "done", completedAt: new Date() }
           : { status: "cancelled" },
     });
+    return res.count;
   });
+
+  if (changed === 0) {
+    return {
+      ok: false,
+      error: "That follow-up is no longer open — it may already be closed. Refresh to see the current list.",
+    };
+  }
 
   await recordActivity(user.tenantId, {
     type: "followup_done",
@@ -119,7 +154,10 @@ export async function updateFollowUpStatusAction(
   });
   revalidatePath("/acquisition/follow-ups");
   revalidatePath("/command");
-  return { ok: true };
+  return {
+    ok: true,
+    message: parsed.data.action === "done" ? "Follow-up marked done." : "Follow-up cancelled.",
+  };
 }
 
 // ------------------------------------------------------------------
@@ -143,13 +181,53 @@ export async function resendReportAction(
   if (!manifest) return { ok: false, error: "Batch manifest not found on disk." };
 
   const files: { name: string; base64: string }[] = [];
+  // Durable copies first: previously archived StoredObjects survive engine
+  // restarts. Legacy engine-host paths below are the fallback.
+  try {
+    const { wavesStorageConfig } = await import("@/lib/wavesco/object-storage");
+    const { storageGet } = await import("@/lib/wavesco/object-storage");
+    const resolved = wavesStorageConfig();
+    if (!("error" in resolved)) {
+      const archived = await withTenantContext(user.tenantId, async (tx) =>
+        tx.storedObject.findMany({
+          where: { tenantId: user.tenantId, batchId: manifest.batchId, kind: "report", status: "READY" },
+        }),
+      );
+      for (const o of archived) {
+        const got = await storageGet(resolved.config, user.tenantId, o.objectKey).catch(() => null);
+        if (got?.ok && got.data) {
+          files.push({ name: o.fileName, base64: got.data.body.toString("base64") });
+        }
+      }
+    }
+  } catch {
+    // fall through to legacy paths
+  }
+  const seen = new Set(files.map((f) => f.name));
+  // In remote mode the manifest paths are on the engine host and never exist on
+  // the Next host, so this used to report "no longer present on disk" while the
+  // PDF link directly above it downloaded fine. Fetch through the engine API.
+  if (files.length < 2 && leadEngineMode() === "remote") {
+    for (const type of ["pdf", "xlsx"] as const) {
+      const name = `${manifest.batchId}.${type}`;
+      if (seen.has(name)) continue;
+      const got = await fetchManifestFile(manifest.batchId, type).catch(() => null);
+      if (got?.ok) {
+        files.push({ name: got.filename ?? name, base64: Buffer.from(got.body).toString("base64") });
+        seen.add(name);
+      }
+    }
+  }
   for (const p of [manifest.pdfPath, manifest.excelPath]) {
     if (p && existsSync(p)) {
       try {
+        const name = p.split(/[\\/]/).pop() ?? "report";
+        if (seen.has(name)) continue; // already attached from durable storage
         files.push({
-          name: p.split(/[\\/]/).pop() ?? "report",
+          name,
           base64: readFileSync(p).toString("base64"),
         });
+        seen.add(name);
       } catch {
         // unreadable — skip this file
       }
@@ -194,12 +272,19 @@ export async function resendReportAction(
     return { ok: false, error: e instanceof Error ? e.message : "Notify Hub unreachable." };
   }
 
-  const okDelivery = delivered.includes("telegram_sent") || delivered.length > 0;
+  // `delivered.length > 0` treated "failed", "queued" or any other non-empty
+  // value as success, so a failed Telegram send rendered in emerald and wrote a
+  // report_delivered audit row.
+  const okDelivery = delivered
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .every((s) => s === "telegram_sent");
   await recordActivity(user.tenantId, {
     type: okDelivery ? "report_delivered" : "automation_failed",
     title: okDelivery
-      ? `Batch ${manifest.batchId} resent to Telegram (${delivered})`
-      : `Telegram delivery unresolved for batch ${manifest.batchId}`,
+      ? `Batch ${manifest.batchId} resent to Telegram`
+      : `Telegram delivery did not confirm for batch ${manifest.batchId}`,
     entityType: "batch",
     entityId: manifest.batchId,
     href: "/acquisition/reports",
@@ -209,6 +294,9 @@ export async function resendReportAction(
   revalidatePath("/acquisition/reports");
   revalidatePath("/command");
   return okDelivery
-    ? { ok: true, message: `Delivered via Notify Hub (${delivered || "accepted"}).` }
-    : { ok: false, error: `Notify Hub accepted but delivery state unclear (${delivered || "no field"}).` };
+    ? { ok: true, message: "Sent to Telegram." }
+    : {
+        ok: false,
+        error: "Telegram did not confirm delivery. The files are still available to download on this page.",
+      };
 }

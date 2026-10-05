@@ -7,6 +7,52 @@ import { AutoRefresh } from "@/components/command/auto-refresh";
 import { TestConnectionButton } from "@/components/acquisition/integrations-controls";
 import { StorageConnectorCard } from "@/components/acquisition/storage-connector-card";
 import { readPersistedStorageConfig, sanitizeStorageConfigForClient } from "@/lib/wavesco/storage";
+import { storageDescribe, storagePing, wavesStorageConfig } from "@/lib/wavesco/object-storage";
+
+async function WavesStorageCard({ tenantId }: { tenantId: string }) {
+  const resolved = wavesStorageConfig();
+  if ("error" in resolved) {
+    return (
+      <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+        <p className="text-sm font-medium">Waves-held storage — unavailable</p>
+        <p className="mt-1 text-xs text-muted-foreground">{resolved.error}</p>
+        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Uploads, report archiving and downloads are disabled until an operator configures persistent storage.</p>
+      </div>
+    );
+  }
+  const ping = await storagePing(resolved.config);
+  let counts: Record<string, number> = {};
+  try {
+    counts = await withTenantContext(tenantId, async (tx) => {
+      const rows = await tx.storedObject.groupBy({ by: ["status"], where: { tenantId }, _count: true });
+      return Object.fromEntries(rows.map((r) => [r.status, r._count]));
+    });
+  } catch {
+    counts = {};
+  }
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return (
+    <div className="rounded-lg border border-border/80 bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">Waves-held storage (reports, uploads, exports)</p>
+          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+            {ping.provider} · {storageDescribe(resolved.config).location} · {ping.detail} · {ping.latencyMs}ms
+          </p>
+        </div>
+        <StatusPill state={ping.ok ? "connected" : "error"} />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {total === 0
+          ? "No files stored yet — uploads and archived reports appear here with checksums."
+          : Object.entries(counts).map(([s, c]) => `${c} ${s.toLowerCase()}`).join(" · ")}
+      </p>
+      {!ping.ok && (
+        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Writes and downloads will fail visibly until connectivity is restored — nothing is silently lost.</p>
+      )}
+    </div>
+  );
+}
 import { withTenantContext } from "@wavesco/db";
 
 export const dynamic = "force-dynamic";
@@ -83,17 +129,18 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Integrations — Acquisition OS</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Systems</p>
+          <h1 className="mt-1 font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Integrations — Acquisition OS</h1>
+          <p className="mt-1.5 max-w-2xl font-sans text-[13px] leading-5 text-muted-foreground">
             Health matrix for Lead Engine, Postgres, n8n, Brevo, AI Gateway. Test Connection is server-side only — keys never leak to browser, URLs are masked.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={30_000} />
           <StatusPill state={blocked.length > 0 ? "disconnected" : hasError ? "error" : "connected"} />
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">
+          <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             {blocked.length > 0 ? `BLOCKED (${blocked.length})` : hasError ? "ERROR" : "LIVE"}
           </span>
         </div>
@@ -102,8 +149,8 @@ export default async function IntegrationsPage() {
       {loadError ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 text-sm">
           <p className="font-medium text-red-600 dark:text-red-400">Failed to load integrations health</p>
-          <p className="text-xs text-muted-foreground">{loadError}</p>
-          <a href="/acquisition/integrations" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">{loadError}</p>
+          <a href="/acquisition/integrations" className="mt-2 inline-block rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
             Retry
           </a>
         </div>
@@ -119,7 +166,7 @@ export default async function IntegrationsPage() {
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
             Tip: set the missing env vars (LEAD_ENGINE_ROOT, DATABASE_URL, N8N_BASE_URL, BREVO_API_KEY, OPENAI_API_KEY / OLLAMA) server-side; page shows only masked URLs.
           </p>
         </div>
@@ -127,11 +174,13 @@ export default async function IntegrationsPage() {
 
       <StorageConnectorCard initial={storageInitial} />
 
+      <WavesStorageCard tenantId={tenantId} />
+
       {/* Health matrix */}
-      <div className="overflow-x-auto rounded-lg border bg-card">
+      <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-muted/20 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr className="border-b border-border/60 bg-muted/20 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
               <th className="px-3 py-2">Integration</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Detail</th>
@@ -173,21 +222,21 @@ export default async function IntegrationsPage() {
                     ? "—"
                     : "—";
                 return (
-                  <tr key={it.key} className="border-b last:border-0 hover:bg-accent/40">
+                  <tr key={it.key} className="border-b border-border/60 last:border-0 hover:bg-card-hover">
                     <td className="px-3 py-3">
                       <p className="text-sm font-medium">{it.label}</p>
                       <p className="font-mono text-[11px] text-muted-foreground">{it.key}</p>
                     </td>
                     <td className="px-3 py-3">
                       <StatusPill state={pillState(status)} />
-                      <span className="ml-2 text-xs uppercase tracking-wide">{status}</span>
+                      <span className="ml-2 font-mono text-[11px] font-medium uppercase tracking-[0.08em]">{status}</span>
                     </td>
                     <td className="max-w-[260px] px-3 py-3">
                       <p className="line-clamp-2 text-xs" title={detail}>
                         {detail}
                       </p>
                       {entry?.reason && entry.reason !== detail ? (
-                        <p className="text-[11px] text-muted-foreground" title={entry.reason}>
+                        <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground" title={entry.reason}>
                           {entry.reason.slice(0, 80)}
                         </p>
                       ) : null}
@@ -196,7 +245,7 @@ export default async function IntegrationsPage() {
                       <span className="font-mono text-xs" title={url}>
                         {typeof url === "string" && url.length > 40 ? `${url.slice(0, 40)}…` : url}
                       </span>
-                      <p className="text-[11px] text-muted-foreground">masked via maskUrl</p>
+                      <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">masked via maskUrl</p>
                     </td>
                     <td className="px-3 py-3 text-xs tabular-nums">{latency}</td>
                     <td className="px-3 py-3 text-xs text-muted-foreground">{last}</td>
@@ -214,9 +263,9 @@ export default async function IntegrationsPage() {
 
       {/* API health + usage details */}
       <div className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-semibold">API health</h3>
-          <p className="text-xs text-muted-foreground">Live probes are server-side; Test Connection audits to AuditLog with model IntegrationStatus.</p>
+        <div className="rounded-lg border border-border/80 bg-card p-4">
+          <h3 className="font-sans text-[13px] font-semibold tracking-[-0.01em] text-foreground">API health</h3>
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">Live probes are server-side; Test Connection audits to AuditLog with model IntegrationStatus.</p>
           <div className="mt-3 space-y-2">
             {integrations.map((it) => {
               const entry = it.entry as unknown as { status?: string; detail?: string; latencyMs?: number } | undefined;
@@ -231,17 +280,17 @@ export default async function IntegrationsPage() {
               );
             })}
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
             Blocked integrations return 200 with status BLOCKED — never 500, never leak api_key/secret. All probes are audited as integration.test.
           </p>
         </div>
 
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-semibold">Usage where available</h3>
-          <p className="text-xs text-muted-foreground">AI Gateway usage from AiUsageLog counts (total, last 24h). Other integrations show latency where measured.</p>
+        <div className="rounded-lg border border-border/80 bg-card p-4">
+          <h3 className="font-sans text-[13px] font-semibold tracking-[-0.01em] text-foreground">Usage where available</h3>
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">AI Gateway usage from AiUsageLog counts (total, last 24h). Other integrations show latency where measured.</p>
           <div className="mt-3 space-y-2">
             <div className="rounded border bg-muted/20 p-3">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">AiUsageLog</p>
+              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">AiUsageLog</p>
               {(() => {
                 const ai = health?.ai_gateway as unknown as { usage?: { total?: number; last24h?: number } } | undefined;
                 const u = (ai?.usage as { total?: number; last24h?: number } | null) ?? aiUsageFallback;
@@ -251,32 +300,32 @@ export default async function IntegrationsPage() {
                 return (
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <div className="rounded bg-card p-2">
-                      <p className="text-[11px] text-muted-foreground">Total</p>
+                      <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Total</p>
                       <p className="font-mono text-sm tabular-nums">{u.total ?? 0}</p>
                     </div>
                     <div className="rounded bg-card p-2">
-                      <p className="text-[11px] text-muted-foreground">Last 24h</p>
+                      <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Last 24h</p>
                       <p className="font-mono text-sm tabular-nums">{u.last24h ?? 0}</p>
                     </div>
                   </div>
                 );
               })()}
-              <p className="mt-2 text-[11px] text-muted-foreground">Source: withTenantContext → aiUsageLog.count (tenant {tenantId.slice(0, 8)}…)</p>
+              <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Source: withTenantContext → aiUsageLog.count (tenant {tenantId.slice(0, 8)}…)</p>
             </div>
             <div className="rounded border bg-muted/20 p-3">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Other usage / cost hints</p>
+              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Other usage / cost hints</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Lead Engine: see <span className="font-mono">/acquisition</span> corpus stats. Postgres: latencyMs shown above. n8n: workflows count via <span className="font-mono">/api/acquisition/workflows</span>. Brevo: account endpoint not enumerated here; full usage via Brevo dashboard.
               </p>
             </div>
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
             All URLs and keys are masked (maskUrl / redact) before rendering — server never sends raw secrets to browser.
           </p>
         </div>
       </div>
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
         Server component fetches getIntegrationsHealth(tenantId) — tenant {tenantId} — which aggregates LEAD_ENGINE_ROOT, N8N_BASE_URL, DATABASE_URL, BREVO_API_KEY, AI gateway env. Test Connection buttons POST to /api/acquisition/integrations/test with confirmation, audited as IntegrationStatus.
       </p>
     </div>

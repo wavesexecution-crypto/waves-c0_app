@@ -45,12 +45,12 @@ function ChatInput() {
       style={{
         width: 348,
         maxWidth: "100%",
-        borderRadius: 20,
-        background: "#1d1d1d",
-        boxShadow: "inset 0 0 0 1px rgba(44,47,54,0.52), inset 0 0 50px 0 rgba(255,255,255,0.02)",
+        borderRadius: 12,
+        background: "hsl(var(--card))",
+        border: "1px solid hsl(var(--border) / 0.8)",
         overflow: "hidden",
         position: "relative",
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
     >
       <div style={{ padding: "7px 7px 8px", display: "flex", flexDirection: "column", height: 122 }}>
@@ -95,11 +95,11 @@ export function WaveAiBeam() {
         justifyContent: "center",
         width: "100%",
         minHeight: 360,
-        background: "#0d0d0f",
-        borderRadius: 24,
+        background: "hsl(var(--background))",
+        borderRadius: 12,
         padding: 24,
       }}
-      className="border border-line"
+      className="border border-border/80"
     >
       <BorderBeam size="md" colorVariant="colorful">
         <ChatInput />
@@ -110,8 +110,8 @@ export function WaveAiBeam() {
 
 export function WaveAiHeaderBeam({ children }: { children: React.ReactNode }) {
   return (
-    <BorderBeam size="md" colorVariant="colorful" className="rounded-xl">
-      <div className="rounded-xl bg-card p-6 border border-line">{children}</div>
+    <BorderBeam size="md" colorVariant="colorful" className="rounded-lg">
+      <div className="rounded-lg bg-card p-6 border border-border/80">{children}</div>
     </BorderBeam>
   );
 }

@@ -91,6 +91,9 @@ const openAiCompatible: Adapter = async ({ baseUrl, model, apiKey, input }) => {
       ],
     }),
     cache: "no-store",
+    // Bounded: a hung provider must fail into the deterministic fallback,
+    // never hang the request holding the caller's transaction.
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;

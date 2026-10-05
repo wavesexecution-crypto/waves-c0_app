@@ -28,7 +28,12 @@ export interface ActivityType {
     | "order_sent"
     | "order_failed"
     | "order_cancelled"
-    | "batch_completed";
+    | "batch_completed"
+    | "storage_upload"
+    | "storage_archive"
+    | "storage_missing"
+    | "storage_purge"
+    | "storage_delete";
 }
 
 /**

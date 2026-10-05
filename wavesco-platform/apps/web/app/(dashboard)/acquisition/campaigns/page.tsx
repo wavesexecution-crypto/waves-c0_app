@@ -10,6 +10,7 @@ import { CampaignControls } from "@/components/acquisition/campaign-controls";
 import { StatusPill } from "@/components/command/primitives";
 import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
+import { safeErrorText } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Campaigns" };
@@ -51,13 +52,13 @@ async function CampaignCard({
   const failedRate = metrics.total > 0 ? Math.round((metrics.failed / metrics.total) * 100) : 0;
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="rounded-lg border border-border/80 bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href={`/acquisition/campaigns/${c.id}`} className="font-medium hover:underline">
+          <Link href={`/acquisition/campaigns/${c.id}`} className="font-sans text-[13px] font-medium leading-5 text-foreground hover:underline">
             {c.name}
           </Link>
-          <p className="text-xs text-muted-foreground">
+          <p className="mt-0.5 font-mono text-[11px] leading-5 tracking-[0.02em] text-muted-foreground">
             {[c.location ?? "all locations", c.category ?? "all categories", c.tier ? `tier ${c.tier}` : "all tiers"].join(" · ")}
             {" · created "}
             {formatIST(c.createdAt)}
@@ -67,51 +68,51 @@ async function CampaignCard({
       </div>
 
       {/* Monitor: eligibleSnapshot, sendingLimit, eligibleNow, queued */}
-      <div className="mt-3 grid gap-2 rounded-md border bg-muted/30 p-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-2 rounded-lg border border-border/80 bg-muted/20 p-3 sm:grid-cols-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Monitor</p>
-          <p className="mt-1 text-xs">
-            Eligible now: <strong className={eligibleNow > 0 ? "text-foreground" : "opacity-60"}>{eligibleNow < 0 ? "engine unavailable" : eligibleNow}</strong>
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Monitor</p>
+          <p className="mt-1 font-sans text-[13px] leading-5 text-foreground">
+            Eligible now: <strong className={`font-mono tabular-nums ${eligibleNow > 0 ? "text-foreground" : "opacity-60"}`}>{eligibleNow < 0 ? "engine unavailable" : eligibleNow}</strong>
           </p>
-          <p className="text-xs text-muted-foreground">Queued emails: {metrics.queued ?? metrics.total}</p>
-          <p className="text-xs text-muted-foreground">Sending limit: {c.sendingLimit ?? "no cap"}</p>
+          <p className="font-mono text-[11px] leading-5 tracking-[0.02em] text-muted-foreground">Queued emails: {metrics.queued ?? metrics.total}</p>
+          <p className="font-mono text-[11px] leading-5 tracking-[0.02em] text-muted-foreground">Sending limit: {c.sendingLimit ?? "no cap"}</p>
           {snapshot ? (
-            <p className="mt-1 truncate text-[11px] text-muted-foreground" title={JSON.stringify(snapshot)}>
+            <p className="mt-1 truncate font-mono text-[11px] tracking-[0.02em] text-muted-foreground" title={JSON.stringify(snapshot)}>
               Snapshot: {JSON.stringify(snapshot).slice(0, 120)}
               {JSON.stringify(snapshot).length > 120 ? "…" : ""}
             </p>
           ) : (
-            <p className="text-[11px] text-muted-foreground/60">No eligibleSnapshot yet</p>
+            <p className="font-mono text-[11px] leading-5 tracking-[0.02em] text-muted-foreground/60">No eligibleSnapshot yet</p>
           )}
         </div>
         {/* Analyze: sent/failed rate */}
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Analyze</p>
-          <p className="mt-1 text-xs">
-            Sent: <strong className="tabular-nums">{metrics.sent}</strong> · Failed: <strong className="tabular-nums">{metrics.failed}</strong> · Total: {metrics.total}
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Analyze</p>
+          <p className="mt-1 font-sans text-[13px] leading-5 text-foreground">
+            Sent: <strong className="font-mono tabular-nums">{metrics.sent}</strong> · Failed: <strong className="font-mono tabular-nums">{metrics.failed}</strong> · Total: <span className="font-mono tabular-nums">{metrics.total}</span>
           </p>
           {metrics.total > 0 ? (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
               Sent {sentRate}% · Failed {failedRate}%
             </p>
           ) : (
-            <p className="text-[11px] text-muted-foreground/60">No sends yet</p>
+            <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground/60">No sends yet</p>
           )}
-          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div className="h-full bg-emerald-500" style={{ width: `${sentRate}%` }} />
           </div>
         </div>
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">State</p>
-          <p className="mt-1 text-xs">
-            Status: <span className="font-mono text-xs uppercase">{c.status}</span>
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">State</p>
+          <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            Status: <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-foreground">{c.status}</span>
           </p>
-          {c.scheduledFor ? <p className="text-[11px] text-muted-foreground">Scheduled: {formatIST(c.scheduledFor)}</p> : null}
+          {c.scheduledFor ? <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Scheduled: {formatIST(c.scheduledFor)}</p> : null}
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <Link href={`/acquisition/campaigns/${c.id}`} className="rounded-md border px-2.5 py-1 text-xs hover:bg-accent">
+            <Link href={`/acquisition/campaigns/${c.id}`} className="rounded-lg border border-border/80 px-2.5 py-1 font-sans text-[13px] text-foreground hover:bg-muted/50">
               Inspect
             </Link>
-            <Link href={`/acquisition/campaigns/${c.id}`} className="rounded-md border px-2.5 py-1 text-xs hover:bg-accent">
+            <Link href={`/acquisition/campaigns/${c.id}`} className="rounded-lg border border-border/80 px-2.5 py-1 font-sans text-[13px] text-foreground hover:bg-muted/50">
               Configure
             </Link>
           </div>
@@ -119,9 +120,9 @@ async function CampaignCard({
       </div>
 
       {/* Controls: Launch/Pause/Resume/Stop with confirm dialogs (client) */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
         <CampaignControls campaignId={c.id} status={c.status} campaignName={c.name} />
-        <Link href={`/acquisition/campaigns/${c.id}`} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+        <Link href={`/acquisition/campaigns/${c.id}`} className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground hover:text-foreground hover:underline">
           Open detail →
         </Link>
       </div>
@@ -150,7 +151,7 @@ export default async function CampaignsPage() {
   try {
     facets = await getFacets();
   } catch (e) {
-    engineError = e instanceof Error ? e.message : "Lead Engine unreachable";
+    engineError = safeErrorText(e, "The lead database is temporarily unavailable. Metrics return automatically.", "leads:corpus");
   }
 
   const campaigns = await loadCampaigns(tenantId);
@@ -159,41 +160,41 @@ export default async function CampaignsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Campaigns</h1>
+          <p className="mt-1 max-w-3xl font-sans text-[13px] leading-5 text-muted-foreground">
             Segments are counted against the live lead corpus. Sends go through the existing Approval Queue — the
             platform never sends email itself.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={10_000} />
-          <Link href="#new-campaign" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          <Link href="#new-campaign" className="rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90">
             + Create
           </Link>
-          <Link href="/acquisition/outreach" className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
+          <Link href="/acquisition/outreach" className="rounded-lg border border-border/80 bg-card px-3 py-1.5 font-sans text-[13px] text-foreground hover:bg-muted/50">
             Outreach
           </Link>
         </div>
       </div>
 
       {/* Control bar summary */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-xs">
-        <span className="font-medium uppercase tracking-widest text-muted-foreground">Control:</span>
-        <span className="rounded-full border px-2 py-0.5">Create → forms a draft</span>
-        <span className="rounded-full border px-2 py-0.5">Configure → detail</span>
-        <span className="rounded-full border px-2 py-0.5">Launch / Pause / Resume / Stop</span>
-        <span className="rounded-full border px-2 py-0.5">Inspect → detail + monitor</span>
-        <span className="rounded-full border px-2 py-0.5">Analyze → sent/failed rate</span>
-        <span className="ml-auto text-[11px] text-muted-foreground">{campaigns.length} campaigns · state reflects DB + audit</span>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-card p-3">
+        <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Control:</span>
+        <span className="rounded-full border border-border/80 px-2 py-0.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Create → forms a draft</span>
+        <span className="rounded-full border border-border/80 px-2 py-0.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Configure → detail</span>
+        <span className="rounded-full border border-border/80 px-2 py-0.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Launch / Pause / Resume / Stop</span>
+        <span className="rounded-full border border-border/80 px-2 py-0.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Inspect → detail + monitor</span>
+        <span className="rounded-full border border-border/80 px-2 py-0.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Analyze → sent/failed rate</span>
+        <span className="ml-auto font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{campaigns.length} campaigns · state reflects DB + audit</span>
       </div>
 
       <section id="new-campaign" className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">New campaign</h2>
+        <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">New campaign</h2>
         {engineError || !facets ? (
-          <div className="rounded-lg border border-dashed border-red-500/40 p-4 text-sm">
-            <p className="font-medium">Cannot build segments — Lead Engine unavailable</p>
-            <p className="text-xs text-muted-foreground">{engineError}</p>
-            <a href="/acquisition/campaigns" className="mt-2 inline-block rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+          <div className="rounded-lg border border-dashed border-red-500/30 bg-card p-4">
+            <p className="font-sans text-[13px] font-medium text-foreground">Cannot build segments — Lead Engine unavailable</p>
+            <p className="mt-1 font-mono text-[11px] leading-5 tracking-[0.02em] text-muted-foreground">{engineError}</p>
+            <a href="/acquisition/campaigns" className="mt-2 inline-flex rounded-lg border border-border/80 bg-card px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.08em] hover:bg-muted/50">
               Retry
             </a>
           </div>
@@ -203,11 +204,11 @@ export default async function CampaignsPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Campaigns</h2>
+        <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Campaigns</h2>
         {campaigns.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            <p>No campaigns yet. Create one above — eligibility is verified before anything can be queued.</p>
-            <Link href="#new-campaign" className="mt-3 inline-block rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+          <div className="rounded-lg border border-dashed border-border/80 bg-card p-8 text-center">
+            <p className="font-sans text-[13px] text-muted-foreground">No campaigns yet. Create one above — eligibility is verified before anything can be queued.</p>
+            <Link href="#new-campaign" className="mt-3 inline-flex rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90">
               Create First Campaign
             </Link>
           </div>

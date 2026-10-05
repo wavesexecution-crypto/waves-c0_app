@@ -95,35 +95,35 @@ export default async function OutreachPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Cold Email</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Cold Email</h1>
+          <p className="mt-1 max-w-3xl font-sans text-[13px] leading-5 text-muted-foreground">
             Pipeline over the existing production path: Approval Queue → Email Outbox → SMTP. Approve or reject here or via Telegram — both reach the same delivery pipeline. Delivery state is tenant-scoped and audit-logged.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={10_000} />
-          <Link href="/acquisition/email" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          <Link href="/acquisition/email" className="rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90">
             Email Control
           </Link>
-          <Link href="/acquisition/campaigns" className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
+          <Link href="/acquisition/campaigns" className="rounded-lg border border-border/80 bg-card px-3 py-1.5 font-sans text-[13px] text-foreground hover:bg-muted/50">
             Campaigns
           </Link>
         </div>
       </div>
 
       {/* Delivery State Inspection */}
-      <section className="rounded-lg border bg-card p-4">
+      <section className="rounded-lg border border-border/80 bg-card p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Delivery State — Inspection</h2>
-          <span className="text-xs text-muted-foreground">{emails.length} OutreachEmail · {orders.length} OutreachOrder</span>
+          <h2 className="font-display text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">Delivery State — Inspection</h2>
+          <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{emails.length} OutreachEmail · {orders.length} OutreachOrder</span>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Real statuses: submitted / approved / sent / failed plus <span className="font-mono">sendError</span> / <span className="font-mono">error</span> verbatim. No fake telemetry.</p>
+        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Real statuses: submitted / approved / sent / failed plus <span className="font-mono">sendError</span> / <span className="font-mono">error</span> verbatim. No fake telemetry.</p>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {PIPELINE.slice(0, 4).map((s) => (
-            <div key={`email-${s}`} className="rounded-lg border bg-muted/20 p-3 text-center">
+            <div key={`email-${s}`} className="rounded-lg border border-border/80 bg-muted/20 p-3 text-center">
               <StatusPill state={s === "submitted" ? "queued" : s === "sent" ? "connected" : s === "failed" ? "failed" : s} />
-              <p className="mt-1.5 text-xl font-semibold tabular-nums">{counts[s as keyof typeof counts] ?? 0}</p>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{s} (email)</p>
+              <p className="mt-1.5 font-mono text-[20px] font-medium tabular-nums tracking-[-0.02em] text-foreground">{counts[s as keyof typeof counts] ?? 0}</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{s} (email)</p>
             </div>
           ))}
         </div>
@@ -132,73 +132,75 @@ export default async function OutreachPage() {
             {["submitted", "approved", "sent", "failed"].map((s) => {
               const c = orderByStatus.get(s) ?? 0;
               return (
-                <div key={`order-${s}`} className="rounded-lg border border-dashed p-2 text-center">
-                  <p className="text-sm font-semibold tabular-nums">{c}</p>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{s} (order deliveryStatus)</p>
+                <div key={`order-${s}`} className="rounded-lg border border-dashed border-border/80 p-2 text-center">
+                  <p className="font-mono text-[13px] font-semibold tabular-nums tracking-[-0.02em] text-foreground">{c}</p>
+                  <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{s} (order deliveryStatus)</p>
                 </div>
               );
             })}
           </div>
         ) : null}
         {(failedEmails.length > 0 || failedOrders.length > 0) ? (
-          <div className="mt-3 rounded-md border border-red-500/30 bg-red-500/5 p-3">
-            <p className="text-xs font-medium text-red-600 dark:text-red-400">Failed — inspect sendError</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-[11px]">
+          <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-red-600 dark:text-red-400">Failed — inspect sendError</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
               {failedEmails.slice(0, 5).map((e) => (
                 <li key={e.id} className="break-words">
-                  <span className="font-medium">{e.business}</span> ({e.email}) — error: {String(e.error ?? (e as any).sendError ?? "unknown").slice(0, 140)}
+                  <span className="font-medium text-foreground">{e.business}</span> ({e.email}) — error: {String(e.error ?? (e as any).sendError ?? "unknown").slice(0, 140)}
                 </li>
               ))}
               {failedOrders.slice(0, 5).map((o) => (
                 <li key={`o-${o.id}`} className="break-words">
-                  <span className="font-medium">{(o as any).businessName ?? o.business}</span> ({o.email}) — sendError: {String(o.sendError ?? "-").slice(0, 140)} deliveryStatus={String(o.deliveryStatus ?? "-")}
+                  <span className="font-medium text-foreground">{(o as any).businessName ?? o.business}</span> ({o.email}) — sendError: {String(o.sendError ?? "-").slice(0, 140)} deliveryStatus={String(o.deliveryStatus ?? "-")}
                 </li>
               ))}
             </ul>
           </div>
         ) : (
-          <p className="mt-3 text-xs text-muted-foreground">No failures to inspect — healthy queue. Timeline per email shows submitted / decided / sent via <code className="rounded bg-muted px-1">formatIST</code>.</p>
+          <p className="mt-3 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">No failures to inspect — healthy queue. Timeline per email shows submitted / decided / sent via <code className="rounded bg-muted px-1 font-mono">formatIST</code>.</p>
         )}
       </section>
 
       {/* Templates Management */}
-      <section className="rounded-lg border bg-card p-4">
+      <section className="rounded-lg border border-border/80 bg-card p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Templates — Manage</h2>
+          <h2 className="font-display text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">Templates — Manage</h2>
           <div className="flex items-center gap-2">
             <StatusPill state={templatesStatus === "ok" ? "connected" : "disconnected"} />
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">{templatesStatus} · {templates.length} templates</span>
-            <Link href="/acquisition/email" className="rounded-md border px-2.5 py-1 text-xs hover:bg-accent">
+            <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{templatesStatus} · {templates.length} templates</span>
+            <Link href="/acquisition/email" className="rounded-lg border border-border/80 px-2.5 py-1 font-sans text-[13px] text-foreground hover:bg-muted/50">
               Manage in Email Control
             </Link>
           </div>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Tenant-scoped via <code className="rounded bg-muted px-1">withTenantContext</code> + RLS. CRUD via <code className="rounded bg-muted px-1">POST /api/acquisition/email/templates</code> with <code className="rounded bg-muted px-1">auditControl(action=email.template.*)</code>. Preview renders without sending.</p>
+        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Tenant-scoped via <code className="rounded bg-muted px-1 font-mono">withTenantContext</code> + RLS. CRUD via <code className="rounded bg-muted px-1 font-mono">POST /api/acquisition/email/templates</code> with <code className="rounded bg-muted px-1 font-mono">auditControl(action=email.template.*)</code>. Preview renders without sending.</p>
         {templates.length === 0 ? (
-          <div className="mt-3 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-            No templates yet — create one in Email Control. Supports <code className="rounded bg-muted px-1">{"{{business}}"}</code> <code className="rounded bg-muted px-1">{"{{city}}"}</code> vars. API returns <span className="font-mono">not_configured</span> when EmailTemplate table missing, with empty array (never 500).
+          <div className="mt-3 rounded-lg border border-dashed border-border/80 p-4 text-center">
+            <p className="font-sans text-[13px] text-muted-foreground">
+              No templates yet — create one in Email Control. Supports <code className="rounded bg-muted px-1 font-mono">{"{{business}}"}</code> <code className="rounded bg-muted px-1 font-mono">{"{{city}}"}</code> vars. API returns <span className="font-mono tabular-nums">not_configured</span> when EmailTemplate table missing, with empty array (never 500).
+            </p>
             <div className="mt-2">
-              <Link href="/acquisition/email" className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+              <Link href="/acquisition/email" className="rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90">
                 Create First Template
               </Link>
             </div>
           </div>
         ) : (
-          <div className="mt-3 overflow-x-auto rounded-md border">
-            <table className="w-full text-xs">
+          <div className="mt-3 overflow-x-auto rounded-lg border border-border/80">
+            <table className="w-full">
               <thead>
-                <tr className="border-b bg-muted/20 text-left uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2">Template</th>
-                  <th className="px-3 py-2">Subject</th>
-                  <th className="px-3 py-2">Created</th>
+                <tr className="border-b border-border/60 bg-muted/20 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Template</th>
+                  <th className="px-3 py-2 font-medium">Subject</th>
+                  <th className="px-3 py-2 font-medium">Created</th>
                 </tr>
               </thead>
               <tbody>
                 {templates.slice(0, 5).map((t) => (
-                  <tr key={t.id} className="border-b last:border-0 hover:bg-accent/40">
-                    <td className="px-3 py-2 font-mono text-[11px]">{String(t.id).slice(0, 14)}…</td>
-                    <td className="max-w-[260px] truncate px-3 py-2" title={String(t.subject)}>{String(t.subject)}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{t.createdAt ? new Date(String(t.createdAt)).toLocaleString() : "-"}</td>
+                  <tr key={t.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20">
+                    <td className="px-3 py-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{String(t.id).slice(0, 14)}…</td>
+                    <td className="max-w-[260px] truncate px-3 py-2 font-sans text-[13px] text-foreground" title={String(t.subject)}>{String(t.subject)}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{t.createdAt ? new Date(String(t.createdAt)).toLocaleString() : "-"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -208,22 +210,22 @@ export default async function OutreachPage() {
       </section>
 
       {/* Preview */}
-      <section className="rounded-lg border bg-card p-4">
-        <h2 className="text-sm font-semibold">Preview — Render without sending</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Preview calls <code className="rounded bg-muted px-1">POST /api/acquisition/email/templates</code> with <span className="font-mono">{"{ action: \"preview\", template: { subject, body }, vars: { business, city } }"}</span> — pure server-side render, audit-logged as <span className="font-mono">email.template.preview</span>, never hits Brevo/SMTP.</p>
+      <section className="rounded-lg border border-border/80 bg-card p-4">
+        <h2 className="font-display text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">Preview — Render without sending</h2>
+        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Preview calls <code className="rounded bg-muted px-1 font-mono">POST /api/acquisition/email/templates</code> with <span className="font-mono">{"{ action: \"preview\", template: { subject, body }, vars: { business, city } }"}</span> — pure server-side render, audit-logged as <span className="font-mono">email.template.preview</span>, never hits Brevo/SMTP.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-md border bg-muted/20 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Template (raw)</p>
-            <p className="mt-1 font-mono text-xs">Subject: {String(sampleTemplate.subject)}</p>
-            <pre className="mt-2 whitespace-pre-wrap break-words rounded bg-card p-2 text-xs">{String(sampleTemplate.body)}</pre>
-            <p className="mt-2 text-[11px] text-muted-foreground">Vars: business={sampleVars.business}, city={sampleVars.city}</p>
+          <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Template (raw)</p>
+            <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-foreground">Subject: {String(sampleTemplate.subject)}</p>
+            <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-border/80 bg-card p-2 font-mono text-[11px] leading-5 tracking-[0.02em] text-foreground">{String(sampleTemplate.body)}</pre>
+            <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Vars: business={sampleVars.business}, city={sampleVars.city}</p>
           </div>
-          <div className="rounded-md border bg-emerald-500/5 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rendered — no send</p>
-            <p className="mt-1 text-sm font-medium">Subject: {preview.subject}</p>
-            <pre className="mt-2 whitespace-pre-wrap break-words rounded bg-card p-2 text-xs">{preview.body}</pre>
-            <p className="mt-2 text-[11px] text-muted-foreground">Try live preview in Email Control → Templates → Preview (no send).</p>
-            <Link href="/acquisition/email" className="mt-2 inline-block rounded-md border px-2.5 py-1 text-xs hover:bg-accent">
+          <div className="rounded-lg border border-border/80 bg-emerald-500/5 p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Rendered — no send</p>
+            <p className="mt-1 font-sans text-[13px] font-medium text-foreground">Subject: {preview.subject}</p>
+            <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-border/80 bg-card p-2 font-mono text-[11px] leading-5 tracking-[0.02em] text-foreground">{preview.body}</pre>
+            <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Try live preview in Email Control → Templates → Preview (no send).</p>
+            <Link href="/acquisition/email" className="mt-2 inline-flex rounded-lg border border-border/80 px-2.5 py-1 font-sans text-[13px] text-foreground hover:bg-muted/50">
               Open Email Control
             </Link>
           </div>
@@ -231,49 +233,49 @@ export default async function OutreachPage() {
       </section>
 
       {emails.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No cold email activity yet. Queue a campaign under Campaigns; statuses will track real submission, approval and dispatch events.
+        <div className="rounded-lg border border-dashed border-border/80 bg-card p-8 text-center">
+          <p className="font-sans text-[13px] text-muted-foreground">No cold email activity yet. Queue a campaign under Campaigns; statuses will track real submission, approval and dispatch events.</p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {PIPELINE.map((s) => (
-              <div key={s} className="rounded-lg border bg-card p-3 text-center">
+              <div key={s} className="rounded-lg border border-border/80 bg-card p-3 text-center">
                 <StatusPill state={s === "submitted" ? "queued" : s} />
-                <p className="mt-1.5 text-xl font-semibold tabular-nums">{counts[s]}</p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{s}</p>
+                <p className="mt-1.5 font-mono text-[20px] font-medium tabular-nums tracking-[-0.02em] text-foreground">{counts[s]}</p>
+                <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{s}</p>
               </div>
             ))}
           </div>
 
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
+            <table className="w-full">
               <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-2.5">Business / recipient</th>
-                  <th className="px-4 py-2.5">Subject</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5">Approval</th>
-                  <th className="px-4 py-2.5">Timeline</th>
-                  <th className="px-4 py-2.5 text-right">Decision</th>
+                <tr className="border-b border-border/60 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">Business / recipient</th>
+                  <th className="px-4 py-2.5 font-medium">Subject</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 font-medium">Approval</th>
+                  <th className="px-4 py-2.5 font-medium">Timeline</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Decision</th>
                 </tr>
               </thead>
               <tbody>
                 {emails.map((e) => (
-                  <tr key={e.id} className="border-b last:border-0 align-top hover:bg-accent/40">
+                  <tr key={e.id} className="border-b border-border/60 last:border-0 align-top hover:bg-muted/20">
                     <td className="px-4 py-2.5">
-                      <span className="font-medium">{e.business}</span>
-                      <span className="block font-mono text-[11px] text-muted-foreground">{e.email}</span>
-                      {e.campaignId ? <span className="block font-mono text-[10px] text-muted-foreground">campaign: {String(e.campaignId).slice(0, 12)}…</span> : null}
+                      <span className="font-sans text-[13px] font-medium text-foreground">{e.business}</span>
+                      <span className="block font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{e.email}</span>
+                      {e.campaignId ? <span className="block font-mono text-[11px] tracking-[0.02em] text-muted-foreground">campaign: {String(e.campaignId).slice(0, 12)}…</span> : null}
                     </td>
-                    <td className="max-w-[220px] truncate px-4 py-2.5 text-xs">{e.subject}</td>
+                    <td className="max-w-[220px] truncate px-4 py-2.5 font-sans text-[13px] text-foreground">{e.subject}</td>
                     <td className="px-4 py-2.5">
                       <StatusPill state={e.status} />
-                      {e.error ? <span className="mt-1 block max-w-[200px] break-words text-[11px] text-red-500">{e.error}</span> : null}
-                      {(e as any).sendError ? <span className="mt-1 block max-w-[200px] break-words text-[11px] text-red-500">sendError: {String((e as any).sendError).slice(0, 120)}</span> : null}
+                      {e.error ? <span className="mt-1 block max-w-[200px] break-words font-mono text-[11px] tracking-[0.02em] text-red-500">{e.error}</span> : null}
+                      {(e as any).sendError ? <span className="mt-1 block max-w-[200px] break-words font-mono text-[11px] tracking-[0.02em] text-red-500">sendError: {String((e as any).sendError).slice(0, 120)}</span> : null}
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{e.approvalId ?? "-"}</td>
-                    <td className="px-4 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                    <td className="px-4 py-2.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{e.approvalId ?? "-"}</td>
+                    <td className="px-4 py-2.5 font-mono text-[11px] leading-relaxed tracking-[0.02em] text-muted-foreground">
                       submitted {formatIST(e.submittedAt)}
                       <br />
                       decided {formatIST(e.decidedAt)}
@@ -282,9 +284,9 @@ export default async function OutreachPage() {
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       {!e.decidedAt && e.status !== "failed" ? (
-                        <DecideButtons outreachEmailId={e.id} />
+                        <DecideButtons outreachEmailId={e.id} recipient={e.email} subject={e.subject} />
                       ) : (
-                        <span className="text-[11px] text-muted-foreground">-</span>
+                        <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">-</span>
                       )}
                     </td>
                   </tr>
@@ -293,7 +295,7 @@ export default async function OutreachPage() {
             </table>
           </div>
 
-          <p className="text-[11px] text-muted-foreground">
+          <p className="font-mono text-[11px] leading-relaxed tracking-[0.02em] text-muted-foreground">
             Note: &quot;approved&quot; means the decision reached the existing decide endpoint; &quot;sent&quot; is set only when that response confirms dispatch through Email Outbox. Delivery/bounce/reply telemetry does not exist upstream yet and is therefore never shown here — see Email Control for deliveryState + sendError when OutreachOrder is present.
           </p>
         </>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { requireTenantId } from "@/lib/tenant";
+import { requireInternalAccess, requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
 import { getIntegrationsHealth, maskUrl } from "@/lib/wavesco/integrations";
 import { MetricCard, SectionHeader, StatusPill } from "@/components/command/primitives";
@@ -9,6 +9,27 @@ import { AutoRefresh } from "@/components/command/auto-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "System — Acquisition OS" };
+
+interface DbState {
+  campaigns: number;
+  outreachEmails: number;
+  outreachEmailPending: number;
+  outreachEmailFailed: number;
+  outreachEmailSent: number;
+  outreachOrders: number;
+  leadResearch: number;
+  generationBatches: number;
+  generationBatchesFailed: number;
+  generationBatchesQueued: number;
+  followUpsPending: number;
+  followUpsTotal: number;
+  activityEvents: number;
+  auditLogs: number;
+  integrationStatus: number;
+  aiUsageLogs: number;
+  leadLifecycleEvents: number;
+  clients: number;
+}
 
 function pillState(status: string): string {
   const s = String(status ?? "").toLowerCase();
@@ -66,8 +87,11 @@ export default async function SystemPage({
 }: {
   searchParams?: Promise<Record<string, string | string[]>> | Record<string, string | string[]>;
 }) {
-  const session = await auth();
-  const tenantId = requireTenantId(session as unknown);
+const session = await auth();
+const tenantId = requireTenantId(session as unknown);
+// Operator diagnostics expose env-var inventory, integration health and raw
+// error text. Clients must not reach this page by typing the URL.
+requireInternalAccess(session);
 
   let sp: Record<string, string> = {};
   if (searchParams) {
@@ -90,7 +114,7 @@ export default async function SystemPage({
   }
 
   // Gather all system data in one tenant context where possible
-  let dbState: Record<string, number> = {
+  const emptyDbState: DbState = {
     campaigns: 0,
     outreachEmails: 0,
     outreachEmailPending: 0,
@@ -110,6 +134,7 @@ export default async function SystemPage({
     leadLifecycleEvents: 0,
     clients: 0,
   };
+  let dbState: DbState = emptyDbState;
   let logs: any[] = [];
   let errorsOutreach: any[] = [];
   let errorsBatches: any[] = [];
@@ -641,19 +666,24 @@ export default async function SystemPage({
         <div className="rounded-lg border bg-card p-3">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Queue bar — pending vs sent vs failed snapshot</p>
           <div className="mt-3 space-y-2">
-            {[
-              { label: "Pending", value: queueDepth, max: Math.max(queueDepth, dbState.outreachEmailSent, dbState.outreachEmailFailed, 1), color: "bg-amber-500" },
-              { label: "Sent", value: dbState.outreachEmailSent, max: Math.max(queueDepth, dbState.outreachEmailSent, dbState.outreachEmailFailed, 1), color: "bg-emerald-500" },
-              { label: "Failed", value: dbState.outreachEmailFailed, max: Math.max(queueDepth, dbState.outreachEmailSent, dbState.outreachEmailFailed, 1), color: "bg-red-500" },
-            ].map((r) => (
-              <div key={r.label} className="flex items-center gap-3">
-                <span className="w-20 text-xs font-medium">{r.label}</span>
-                <div className="h-3 flex-1 rounded-full bg-muted">
-                  <div className={`h-3 rounded-full ${r.color}`} style={{ width: `${Math.round((r.value / r.max) * 100)}%` }} />
+            {(
+              [
+                { label: "Pending", value: queueDepth, color: "bg-amber-500" },
+                { label: "Sent", value: dbState.outreachEmailSent, color: "bg-emerald-500" },
+                { label: "Failed", value: dbState.outreachEmailFailed, color: "bg-red-500" },
+              ] as const
+            ).map((r) => {
+              const max = Math.max(queueDepth, dbState.outreachEmailSent, dbState.outreachEmailFailed, 1);
+              return (
+                <div key={r.label} className="flex items-center gap-3">
+                  <span className="w-20 text-xs font-medium">{r.label}</span>
+                  <div className="h-3 flex-1 rounded-full bg-muted">
+                    <div className={`h-3 rounded-full ${r.color}`} style={{ width: `${Math.round((r.value / max) * 100)}%` }} />
+                  </div>
+                  <span className="w-12 text-right text-xs tabular-nums">{r.value}</span>
                 </div>
-                <span className="w-12 text-right text-xs tabular-nums">{r.value}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
             Source: withTenantContext tenant {tenantId.slice(0, 8)}… · counts tenant-scoped. Queue depth is OutreachEmail pending — consumers should drain via approval/outbox.

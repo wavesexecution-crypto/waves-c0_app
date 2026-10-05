@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { signIn } from "@/lib/auth";
 import { hashPassword } from "@wavesco/auth";
 import { lookupUserByEmail, withTenantContext } from "@wavesco/db";
+import { startTrial } from "@/lib/wavesco/entitlements";
 import { signupSchema } from "@wavesco/validators";
 
 export interface SignupResult {
@@ -70,6 +71,18 @@ export async function signupAction(
     },
     userId,
   );
+
+  // Provision before signing in. Without this a brand-new client signs up,
+  // lands in the app, and the first click on Acquisition OS shows a paywall
+  // reading "Not rented — no entitlement record". Provisioning is idempotent,
+  // so a retry is safe.
+  try {
+    await startTrial(tenantId, userId);
+  } catch (e) {
+    // Never block sign-in on provisioning. The account is real and the client
+    // can start the trial from Billing; log loudly so it is not missed.
+    console.error("[signup] trial provisioning failed", { tenantId, error: e });
+  }
 
   await signIn("credentials", { email, password, redirectTo: "/overview" });
   return { ok: true };

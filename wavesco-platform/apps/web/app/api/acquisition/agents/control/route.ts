@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auditControl, requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, auditControl, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,8 @@ export async function POST(req: Request) {
   let userId: string | null | undefined;
   try {
     const auth = await requireControlAuth();
+    const denied = await acquisitionDenied(auth.tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     tenantId = auth.tenantId;
     userId = auth.userId;
   } catch (e) {

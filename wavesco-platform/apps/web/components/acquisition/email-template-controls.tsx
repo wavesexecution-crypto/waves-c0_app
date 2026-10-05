@@ -107,11 +107,11 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
   }
 
   return (
-    <div className="space-y-4 rounded-lg border bg-card p-4">
+    <div className="space-y-4 rounded-lg border border-border/80 bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold">Templates — Manage &amp; Preview</h3>
-          <p className="text-xs text-muted-foreground">
+          <h3 className="font-sans text-[13px] font-semibold">Templates — Manage &amp; Preview</h3>
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">
             List, create, update, and preview templates. Preview renders with <code className="rounded bg-muted px-1 py-0.5">{"{{business}}"}</code>{" "}
             <code className="rounded bg-muted px-1 py-0.5">{"{{city}}"}</code> without sending — audit-logged as email.template.preview.
           </p>
@@ -120,7 +120,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
       </div>
 
       {templates.length > 0 ? (
-        <div className="overflow-x-auto rounded-md border">
+        <div className="overflow-x-auto rounded-lg border border-border/80">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b bg-muted/20 text-left uppercase tracking-wide text-muted-foreground">
@@ -149,7 +149,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
           </table>
         </div>
       ) : (
-        <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+        <div className="rounded-lg border border-border/80 border-dashed p-4 text-center text-xs text-muted-foreground">
           No templates yet — create one below. Templates are tenant-scoped and audit-logged. If EmailTemplate table not configured, templates persist as ActivityEvent (type=email_template) or in-memory.
         </div>
       )}
@@ -161,7 +161,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Hello {{business}}"
-            className="mt-1 w-full rounded-md border bg-transparent px-2 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-2 font-sans text-[13px]"
           />
         </label>
         <label className="text-xs">
@@ -171,21 +171,21 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
             onChange={(e) => setBody(e.target.value)}
             rows={6}
             placeholder="Hi {{business}} in {{city}}..."
-            className="mt-1 w-full rounded-md border bg-transparent px-2 py-2 font-mono text-xs"
+            className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-2 font-mono text-xs"
           />
         </label>
         <div className="grid gap-2 sm:grid-cols-3">
           <label className="text-xs">
             <span className="text-muted-foreground">Preview: business</span>
-            <input value={varsBiz} onChange={(e) => setVarsBiz(e.target.value)} className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-xs" />
+            <input value={varsBiz} onChange={(e) => setVarsBiz(e.target.value)} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 text-xs" />
           </label>
           <label className="text-xs">
             <span className="text-muted-foreground">Preview: city</span>
-            <input value={varsCity} onChange={(e) => setVarsCity(e.target.value)} className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-xs" />
+            <input value={varsCity} onChange={(e) => setVarsCity(e.target.value)} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 text-xs" />
           </label>
           <label className="text-xs">
             <span className="text-muted-foreground">Preview: email</span>
-            <input value={varsEmail} onChange={(e) => setVarsEmail(e.target.value)} className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-xs" />
+            <input value={varsEmail} onChange={(e) => setVarsEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 text-xs" />
           </label>
         </div>
         {selectedId ? <p className="text-[11px] text-muted-foreground">Editing template: <span className="font-mono">{selectedId}</span></p> : null}
@@ -194,7 +194,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
             type="button"
             disabled={!!pending}
             onClick={doPreview}
-            className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            className="rounded-lg border border-border/80 px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
           >
             {pending === "preview" ? "Rendering." : "Preview (no send)"}
           </button>
@@ -202,7 +202,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
             type="button"
             disabled={!!pending}
             onClick={doCreate}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {pending === "create" ? "Creating." : "Create"}
           </button>
@@ -210,7 +210,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
             type="button"
             disabled={!!pending || !selectedId}
             onClick={doUpdate}
-            className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            className="rounded-lg border border-border/80 px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
           >
             {pending === "update" ? "Updating." : "Update"}
           </button>
@@ -221,15 +221,15 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
               setPreview(null);
               setMessage("Cleared selection");
             }}
-            className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+            className="rounded-lg border border-border/80 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent"
           >
             Clear
           </button>
         </div>
         {preview ? (
-          <div className="rounded-md border bg-muted/30 p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Preview — Rendered (no send)</p>
-            <p className="mt-1 text-sm font-medium">Subject: {preview.subject}</p>
+          <div className="rounded-lg border border-border/80 bg-muted/30 p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Preview — Rendered (no send)</p>
+            <p className="mt-1 font-sans text-[13px] font-medium">Subject: {preview.subject}</p>
             <pre className="mt-2 whitespace-pre-wrap break-words rounded bg-card p-2 text-xs">{preview.body}</pre>
             <p className="mt-2 text-[11px] text-muted-foreground">Variables: business={varsBiz}, city={varsCity}, email={varsEmail} — rendered server-side via POST preview, audit-logged.</p>
           </div>

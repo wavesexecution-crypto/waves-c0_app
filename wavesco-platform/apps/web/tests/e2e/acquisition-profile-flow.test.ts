@@ -8,6 +8,7 @@ const e2eAudit: any[] = [];
 const e2eImports: any[] = [];
 
 vi.mock("@/lib/wavesco/control", () => ({
+  acquisitionDenied: vi.fn(async () => null),
   requireControlAuth: vi.fn(async () => ({ tenantId: "e2e-profile-tenant", userId: "e2e-user", session: { user: { id: "e2e-user" } } })),
   auditControl: vi.fn(async (args: any) => {
     e2eAudit.push({ ...args, createdAt: new Date().toISOString(), id: `audit_${e2eAudit.length}` });

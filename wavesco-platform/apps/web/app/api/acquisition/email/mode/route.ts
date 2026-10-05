@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { requireControlAuth, auditControl } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth, auditControl } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 import {
   emailModeLabel,
@@ -37,6 +37,8 @@ function modePayload(mode: EmailMode) {
 export async function GET() {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const mode = await withTenantContext(tenantId, async (tx: any) => {
       const profile = await tx.acquisitionProfile.findFirst({
         where: { tenantId },
@@ -57,6 +59,8 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { tenantId, userId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const body = (await req.json().catch(() => ({}))) as { mode?: unknown };
     if (!isEmailMode(body?.mode)) {
       return NextResponse.json(

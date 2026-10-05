@@ -36,11 +36,12 @@ export function classifyEmail(
   }
   if (lead.opted_out === 1) return { status: "OPTED_OUT", email: raw, reason: "lead opted out" };
   if (lead.bounced === 1) return { status: "BOUNCED", email: raw, reason: "previous bounce recorded" };
-  if (
-    lead.date_contacted ||
-    (lead.status.toLowerCase() !== "new" && lead.status.toLowerCase() !== "")
-  ) {
-    return { status: "ALREADY_CONTACTED", email: raw, reason: `corpus status "${lead.status}"` };
+  // Only statuses that mean prior engagement block re-contact. Research-pipeline
+  // states ("queued", "") and unknown states must NOT block — the lead was
+  // never contacted. "reference" rows are corpus seeds, never active leads.
+  const engaged = new Set(["contacted", "meeting", "won", "lost", "excluded", "reference"]);
+  if (lead.date_contacted || engaged.has(lead.status.trim().toLowerCase())) {
+    return { status: "ALREADY_CONTACTED", email: raw, reason: lead.date_contacted ? "already contacted on record" : `corpus status "${lead.status}"` };
   }
   if (liveOrderEmailsForOtherLeads.has(raw)) {
     return { status: "ALREADY_CONTACTED", email: raw, reason: "another lead already holds a live order for this address" };
@@ -149,7 +150,11 @@ export function coercePlanned(raw: unknown, fallback: PlannedEmail): PlannedEmai
     const fs = str(f.subject, 200);
     const fb = str(f.body, 1500);
     if (!fs || !fb) break;
-    followUps.push({ offsetDays: typeof f.offsetDays === "number" ? f.offsetDays : 3 + i * 4, subject: fs, body: fb });
+    // Clamp planner offsets to sane future days (1–90). AI-provided 0,
+    // negative or absurd values must never become past/immediate due dates.
+    const rawOffset = typeof f.offsetDays === "number" && Number.isFinite(f.offsetDays) ? Math.round(f.offsetDays) : 3 + i * 4;
+    const offsetDays = Math.min(Math.max(rawOffset, 1), 90);
+    followUps.push({ offsetDays, subject: fs, body: fb });
   }
   while (followUps.length < 2) {
     const i = followUps.length;
@@ -161,4 +166,35 @@ export function coercePlanned(raw: unknown, fallback: PlannedEmail): PlannedEmai
   }
   const modelLabel = typeof o.model === "string" && o.model.trim() ? o.model.trim().slice(0, 60) : "planner";
   return { subject, body, followUps, model: modelLabel, confidence: fallback.confidence };
+}
+
+/**
+ * Conservative positive-reply classification.
+ *
+ * The platform has no sentiment classifier; `reply_status` is a raw class
+ * string from the lead engine corpus. Only EXPLICIT positive markers are
+ * treated as a positive response — never every reply.
+ */
+export function isPositiveReply(status?: string | null): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  if (!s || ["none", "no reply", "no", "unsubscribed", "unsubscribe"].includes(s)) {
+    return false;
+  }
+  const positive = [
+    "interested",
+    "positive",
+    "yes",
+    "keen",
+    "buying",
+    "available",
+    "want to",
+    "would like",
+    "great",
+    "perfect",
+    "sounds good",
+    "interested in",
+    "positive response",
+  ];
+  return positive.some((p) => s.includes(p));
 }

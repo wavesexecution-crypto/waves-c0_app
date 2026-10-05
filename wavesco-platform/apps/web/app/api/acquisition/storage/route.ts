@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 import {
   encryptStorageCredentials,
@@ -44,6 +44,8 @@ function isUnauthorized(e: unknown): boolean {
 export async function GET() {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const status = await withTenantContext(tenantId, async (tx: any) => {
       const persisted = await readPersistedStorageConfig(tx, tenantId);
       return sanitizeStorageConfigForClient(persisted);
@@ -58,6 +60,8 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
     const bucket = normalizeBucket(String(body.bucket ?? ""));
@@ -161,6 +165,8 @@ export async function POST(req: Request) {
 export async function DELETE() {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     await withTenantContext(tenantId, async (tx: any) => {
       await writePersistedStorageConfig(tx, tenantId, null);
       await tx.activityEvent.create({

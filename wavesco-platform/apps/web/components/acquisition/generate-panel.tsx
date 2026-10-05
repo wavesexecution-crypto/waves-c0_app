@@ -65,9 +65,9 @@ export function GeneratePanel({ lastRequestId }: { lastRequestId: string | null 
 
   return (
     <div className="space-y-5">
-      <form action={formAction} className="rounded-lg border bg-card p-4">
+      <form action={formAction} className="rounded-lg border border-border/80 bg-card p-4">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="text-xs text-muted-foreground">
+          <label className="font-sans text-[13px] leading-5 text-muted-foreground">
             New leads to research
             <input
               name="requestedCount"
@@ -75,13 +75,13 @@ export function GeneratePanel({ lastRequestId }: { lastRequestId: string | null 
               min={1}
               max={60}
               defaultValue={10}
-              className="mt-1 block w-32 rounded-md border bg-transparent px-2 py-1.5 text-sm"
+              className="mt-1 block w-32 rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]"
             />
           </label>
           <button
             type="submit"
             disabled={pending || running}
-            className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-1.5 font-sans text-[13px] font-medium text-primary-foreground disabled:opacity-50"
           >
             {pending ? "Starting…" : running ? "Engine is running…" : "Generate leads"}
           </button>
@@ -95,12 +95,12 @@ export function GeneratePanel({ lastRequestId }: { lastRequestId: string | null 
       </form>
 
       {trackingId ? (
-        <div className="space-y-3 rounded-lg border bg-card p-4">
+        <div className="space-y-3 rounded-lg border border-border/80 bg-card p-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">
+            <h3 className="font-sans text-[13px] font-medium">
               Batch <span className="font-mono text-xs">{trackingId}</span>
             </h3>
-            <span className="text-xs text-muted-foreground">
+            <span className="font-sans text-[13px] leading-5 text-muted-foreground">
               {status?.status ?? "starting…"}
             </span>
           </div>
@@ -109,7 +109,7 @@ export function GeneratePanel({ lastRequestId }: { lastRequestId: string | null 
             {STAGES.map((s, i) => (
               <li
                 key={s.key}
-                className={`rounded-md border px-2 py-1.5 text-center text-xs ${
+                className={`rounded-lg border border-border/80 px-2 py-1.5 text-center text-xs ${
                   i < currentIdx
                     ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                     : i === currentIdx
@@ -124,11 +124,11 @@ export function GeneratePanel({ lastRequestId }: { lastRequestId: string | null 
           </ol>
 
           {status?.error ? (
-            <p className="rounded-md border border-red-500/30 bg-red-500/5 p-2 text-xs text-red-500">{status.error}</p>
+            <p className="rounded-lg border border-red-500/30 bg-red-500/5 p-2 text-xs text-red-500">{status.error}</p>
           ) : null}
 
           {status?.status === "completed" ? (
-            <div className="text-sm">
+            <div className="font-sans text-[13px]">
               <p className="text-emerald-600 dark:text-emerald-400">
                 Completed — engine batch {status.engineBatchId}: {status.resultLeadCount ?? "?"} leads,{" "}
                 {status.emailReadyCount ?? "?"} email-ready.
@@ -152,11 +152,11 @@ export function GeneratePanel({ lastRequestId }: { lastRequestId: string | null 
           ) : null}
 
           {status?.logTail ? (
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/60 p-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-muted/60 p-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
               {status.logTail}
             </pre>
           ) : (
-            <p className="text-xs text-muted-foreground">Waiting for engine log output…</p>
+            <p className="font-sans text-[13px] leading-5 text-muted-foreground">Waiting for engine log output…</p>
           )}
         </div>
       ) : null}

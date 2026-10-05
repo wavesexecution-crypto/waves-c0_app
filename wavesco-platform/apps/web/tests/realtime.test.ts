@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-vi.mock("@/lib/wavesco/control", () => ({ requireControlAuth: vi.fn() }));
+vi.mock("@/lib/wavesco/control", () => ({
+  acquisitionDenied: vi.fn(async () => null), requireControlAuth: vi.fn() }));
 vi.mock("@wavesco/db", () => ({ withTenantContext: vi.fn() }));
 vi.mock("@/lib/wavesco/lead-engine", () => ({
   getLeadStats: vi.fn(),

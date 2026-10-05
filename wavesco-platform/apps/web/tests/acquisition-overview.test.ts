@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/wavesco/control", () => ({ requireControlAuth: vi.fn() }));
+vi.mock("@/lib/wavesco/control", () => ({
+  acquisitionDenied: vi.fn(async () => null), requireControlAuth: vi.fn() }));
 vi.mock("@wavesco/db", () => ({ withTenantContext: vi.fn() }));
 vi.mock("@/lib/wavesco/lead-engine", () => ({
   getLeadStats: vi.fn(),
@@ -17,7 +18,7 @@ describe("GET /api/acquisition/overview", () => {
     const { requireControlAuth } = await import("@/lib/wavesco/control");
     vi.mocked(requireControlAuth).mockRejectedValueOnce(new Error("UNAUTHORIZED"));
     const { GET } = await import("@/app/api/acquisition/overview/route");
-    const res = await GET(new Request("http://test"));
+    const res = await GET();
     expect(res.status).toBe(401);
   });
 

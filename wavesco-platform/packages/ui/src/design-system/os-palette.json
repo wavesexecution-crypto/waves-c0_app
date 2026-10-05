@@ -1,0 +1,63 @@
+{
+  "source": "Acquisition OS — D:\\waves-c0_app\\wavesco-platform\\apps\\web\\styles\\globals.css (.dark) + packages\\ui\\src\\tokens.ts — verified 2026-09-22",
+  "canonical": "Acquisition OS → Canonical OS Color Palette → Every future WAVES OS",
+  "mode": "dark is truth, light is fallback",
+  "dark": {
+    "background": { "hsl": "222 47% 3.5%", "hex": "#05070D", "rgb": "5,7,13", "purpose": "Primary background — app shell, page canvas, header/sidebar base" },
+    "foreground": { "hsl": "38 12% 96%", "hex": "#F6F5F4", "rgb": "246,245,244", "purpose": "Primary text — headings, body, high-contrast content" },
+    "card": { "hsl": "222 36% 7.5%", "hex": "#0C101A", "rgb": "12,16,26", "purpose": "Secondary/surface — cards, panels, sidebar, header surfaces" },
+    "card-hover": { "hsl": "222 30% 10.5%", "hex": "#131823", "rgb": "19,24,35", "purpose": "Elevated surface — card hover, secondary background, hover/active surfaces" },
+    "popover": { "hsl": "222 36% 7.5%", "hex": "#0C101A", "rgb": "12,16,26", "purpose": "Popover surface — dropdowns, modals, tooltips" },
+    "surface-elevated": { "hsl": "222 30% 10.5%", "hex": "#131823", "rgb": "19,24,35", "purpose": "Elevated surface — secondary panels" },
+    "surface-overlay": { "hsl": "222 28% 13%", "hex": "#181D2A", "rgb": "24,29,42", "purpose": "Overlay surface — dialogs, sheets" },
+    "primary": { "hsl": "38 12% 96%", "hex": "#F6F5F4", "rgb": "246,245,244", "purpose": "Primary action background — primary buttons (light on dark)" },
+    "primary-foreground": { "hsl": "222 47% 3.5%", "hex": "#05070D", "rgb": "5,7,13", "purpose": "Primary action text — on primary" },
+    "secondary": { "hsl": "222 30% 10.5%", "hex": "#131823", "rgb": "19,24,35", "purpose": "Secondary action background — secondary buttons, muted controls" },
+    "secondary-foreground": { "hsl": "38 12% 92%", "hex": "#EDEBE8", "rgb": "237,235,232", "purpose": "Secondary action text" },
+    "muted": { "hsl": "222 28% 12%", "hex": "#161B27", "rgb": "22,27,39", "purpose": "Muted background — inputs, subtle surfaces, disabled backgrounds" },
+    "muted-foreground": { "hsl": "222 10% 58%", "hex": "#89909F", "rgb": "137,144,159", "purpose": "Secondary/muted text — descriptions, placeholders, table headers, secondary info" },
+    "text-secondary": { "hsl": "222 10% 62%", "hex": "#949AA8", "rgb": "148,154,168", "purpose": "Secondary text — alternative muted text, slightly lighter than muted-foreground" },
+    "text-faint": { "hsl": "222 6% 38%", "hex": "#5B5F67", "rgb": "91,95,103", "purpose": "Faint text — disabled, captions, very subtle" },
+    "accent": { "hsl": "173 84% 42%", "hex": "#11C5B0", "rgb": "17,197,176", "purpose": "Primary accent — interactive, links, success, focus, glow, active states" },
+    "accent-foreground": { "hsl": "222 47% 3.5%", "hex": "#05070D", "rgb": "5,7,13", "purpose": "Text on accent" },
+    "accent-secondary": { "hsl": "262 83% 62%", "hex": "#894EEF", "rgb": "137,78,239", "purpose": "Secondary accent — violet, alternative accent, charts, badges" },
+    "destructive": { "hsl": "0 72% 52%", "hex": "#DD2C2C", "rgb": "221,44,44", "purpose": "Error/destructive — errors, delete actions, destructive buttons, error states" },
+    "destructive-foreground": { "hsl": "0 0% 98%", "hex": "#FAFAFA", "rgb": "250,250,250", "purpose": "Text on destructive" },
+    "border": { "hsl": "222 16% 14%", "hex": "#1E2129", "rgb": "30,33,41", "purpose": "Borders/dividers — card borders, dividers, input borders" },
+    "border-strong": { "hsl": "222 16% 18%", "hex": "#272B35", "rgb": "39,43,53", "purpose": "Strong borders — hover borders, emphasized dividers" },
+    "input": { "hsl": "222 16% 14%", "hex": "#1E2129", "rgb": "30,33,41", "purpose": "Input background/border" },
+    "ring": { "hsl": "173 84% 42%", "hex": "#11C5B0", "rgb": "17,197,176", "purpose": "Focus ring — keyboard focus, accent ring" },
+    "glow": { "hsl": "173 84% 42%", "hex": "#11C5B0", "rgb": "17,197,176", "purpose": "Glow — accent glow, shadows" }
+  },
+  "light": {
+    "background": { "hsl": "36 33% 98%", "hex": "#FCFAF8", "rgb": "252,250,248", "purpose": "Light background fallback" },
+    "foreground": { "hsl": "222 47% 7%", "hex": "#090E1A", "rgb": "9,14,26", "purpose": "Light foreground" },
+    "card": { "hsl": "0 0% 100%", "hex": "#FFFFFF", "rgb": "255,255,255", "purpose": "Light card" },
+    "border": { "hsl": "222 14% 88%", "hex": "#DCDFE5", "rgb": "220,223,229", "purpose": "Light border" },
+    "accent": { "hsl": "173 80% 40%", "hex": "#14B8A5", "rgb": "20,184,165", "purpose": "Light accent" }
+  },
+  "semanticMapping": {
+    "primaryBackground": "background (222 47% 3.5% #05070D)",
+    "secondarySurface": "card (222 36% 7.5% #0C101A)",
+    "elevatedSurface": "card-hover / surface-elevated (222 30% 10.5% #131823)",
+    "overlaySurface": "surface-overlay (222 28% 13% #181D2A)",
+    "primaryText": "foreground (38 12% 96% #F6F5F4)",
+    "secondaryText": "muted-foreground (222 10% 58% #89909F) / text-secondary (222 10% 62% #949AA8)",
+    "faintText": "text-faint (222 6% 38% #5B5F67)",
+    "borderDivider": "border (222 16% 14% #1E2129) / border-strong (222 16% 18% #272B35)",
+    "primaryAccent": "accent (173 84% 42% #11C5B0) — also success, hover/active, ring, glow",
+    "accentSecondary": "accent-secondary (262 83% 62% #894EEF) — violet charts/badges",
+    "hoverActive": "card-hover (222 30% 10.5% #131823) + accent (173 84% 42%) for interactive",
+    "success": "accent (173 84% 42% #11C5B0) — primary accent is success",
+    "warning": "38 92% 50% #F59E0B (extended, not in Acquisition OS core — use for warning states, mapped to --warn in consuming OS)",
+    "errorDestructive": "destructive (0 72% 52% #DD2C2C)",
+    "input": "input/border (222 16% 14% #1E2129) + muted (222 28% 12% #161B27)",
+    "focusRing": "ring/glow (173 84% 42% #11C5B0)"
+  },
+  "usage": {
+    "css": "hsl(var(--background)) etc — see D:\\waves-c0_app\\wavesco-platform\\apps\\web\\styles\\globals.css (.dark)",
+    "tailwind": "hsl(var(--border)) via tailwind.config.ts theme.extend.colors.border DEFAULT hsl(var(--border)) etc",
+    "tokensFile": "D:\\waves-c0_app\\wavesco-platform\\packages\\ui\\src\\tokens.ts — wavesTokens.colors (canonical)",
+    "tradeOsMigration": "D:\\trade-os\\src\\app\\globals.css — copied Acquisition OS :root/.dark verbatim + Trade OS aliases (--panel → card etc) + layout.tsx class=\"dark\" + pages hsl(var(--...))"
+  }
+}

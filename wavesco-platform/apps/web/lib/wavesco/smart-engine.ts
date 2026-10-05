@@ -126,7 +126,11 @@ function runChecks(lead: EngineLead): CheckResult[] {
     },
     {
       name: "verification",
-      passed: !!lead.verification && lead.verification !== "unverified",
+      // Case-insensitive exact match only. "Verify First" / "UNVERIFIED" /
+      // null must NOT pass — the lead still needs verification, otherwise
+      // SmartEngine would route to CREATE_OUTREACH while order creation
+      // (classifyEmail) refuses the same lead.
+      passed: (lead.verification ?? "").toLowerCase() === "verified",
       value: lead.verification,
       weight: 5,
     },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { StatusPill } from "@/components/command/primitives";
 import { formatIST, relativeFrom } from "@/lib/wavesco/time";
 
@@ -31,27 +32,44 @@ function mapState(state: string): string {
 export function OverviewLive() {
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unauthorized, setUnauthorized] = useState(false);
   const [lastFetchAt, setLastFetchAt] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
+    let consecutiveFailures = 0;
 
     async function fetchOverview() {
       try {
         const res = await fetch("/api/acquisition/overview", { cache: "no-store" });
         if (!res.ok) {
-          if (res.status === 401) throw new Error("unauthorized");
+          if (res.status === 401) {
+            // Session expired: stop polling entirely. Leaving the interval
+            // running meant a permanent "unauthorized" banner with no way back.
+            if (interval) clearInterval(interval);
+            interval = null;
+            if (!cancelled) setUnauthorized(true);
+            return;
+          }
           throw new Error(`HTTP ${res.status}`);
         }
         const json = (await res.json()) as OverviewResponse;
+        consecutiveFailures = 0;
         if (!cancelled) {
           setData(json);
           setError(null);
           setLastFetchAt(new Date());
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        consecutiveFailures += 1;
+        // Give up after repeated failures instead of polling indefinitely on a
+        // route that will never answer.
+        if (consecutiveFailures >= 3 && interval) {
+          clearInterval(interval);
+          interval = null;
+        }
+        if (!cancelled) setError("Live health is temporarily unavailable.");
       }
     }
 
@@ -63,11 +81,37 @@ export function OverviewLive() {
     };
   }, []);
 
+  if (unauthorized) {
+    return (
+      <section className="space-y-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+        <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Your session has expired</p>
+        <p className="font-sans text-[13px] leading-5 text-muted-foreground">
+          Sign in again to keep watching live activity. The figures above are from your last successful load.
+        </p>
+        <Link
+          href="/login"
+          className="inline-block rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Sign in again
+        </Link>
+      </section>
+    );
+  }
+
   if (error) {
     return (
-      <section className="space-y-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+      <section className="space-y-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
         <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Live health unavailable</p>
-        <p className="text-xs text-muted-foreground">{error} — showing server-rendered fallback above.</p>
+        <p className="font-sans text-[13px] leading-5 text-muted-foreground">
+          {error} The figures above are from your last successful load.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-md border border-border/80 px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+        >
+          Try again
+        </button>
       </section>
     );
   }
@@ -75,7 +119,7 @@ export function OverviewLive() {
   if (!data) {
     return (
       <section className="space-y-3">
-        <p className="text-xs text-muted-foreground">Loading live health…</p>
+        <p className="font-sans text-[13px] leading-5 text-muted-foreground">Loading live health…</p>
       </section>
     );
   }
@@ -86,27 +130,27 @@ export function OverviewLive() {
     <div className="space-y-6">
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Live System Health</h2>
+          <h2 className="font-sans text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">Live System Health</h2>
           <span className="text-[11px] text-muted-foreground">{lastFetchAt ? `updated ${relativeFrom(lastFetchAt.toISOString())}` : ""} · polls every 30s</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="flex items-center justify-between rounded-lg border bg-card p-3">
+          <div className="flex items-center justify-between rounded-lg border border-border/80 bg-card p-3">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lead Engine</p>
+              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Lead Engine</p>
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{system.leadEngine.detail}</p>
             </div>
             <StatusPill state={mapState(system.leadEngine.status)} />
           </div>
-          <div className="flex items-center justify-between rounded-lg border bg-card p-3">
+          <div className="flex items-center justify-between rounded-lg border border-border/80 bg-card p-3">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Database</p>
+              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Database</p>
               <p className="mt-1 text-xs text-muted-foreground">{system.db.detail}</p>
             </div>
             <StatusPill state={mapState(system.db.status)} />
           </div>
-          <div className="flex items-center justify-between rounded-lg border bg-card p-3">
+          <div className="flex items-center justify-between rounded-lg border border-border/80 bg-card p-3">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">n8n</p>
+              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">n8n</p>
               <p className="mt-1 text-xs text-muted-foreground">{system.n8n.detail}</p>
             </div>
             <StatusPill state={mapState(system.n8n.status)} />
@@ -120,13 +164,13 @@ export function OverviewLive() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Recent Activity — Last 5</h2>
+        <h2 className="font-sans text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">Recent Activity — Last 5</h2>
         {recentActivity && recentActivity.length > 0 ? (
-          <ul className="divide-y rounded-lg border bg-card">
+          <ul className="divide-y rounded-lg border border-border/80 bg-card">
             {recentActivity.map((ev) => (
               <li key={ev.id} className="flex items-center justify-between px-4 py-2">
                 <div>
-                  <p className="text-xs font-medium">{ev.title}</p>
+                  <p className="font-sans text-[13px] font-medium tracking-[-0.01em]">{ev.title}</p>
                   <p className="text-[11px] text-muted-foreground">{ev.type} · {relativeFrom(ev.createdAt)}</p>
                 </div>
                 {ev.href ? <a href={ev.href} className="text-xs text-primary hover:underline">Open</a> : null}
@@ -134,7 +178,7 @@ export function OverviewLive() {
             ))}
           </ul>
         ) : (
-          <p className="rounded-lg border border-dashed p-4 text-xs text-muted-foreground">No recent activity yet. Leads, campaigns and outreach will appear here.</p>
+          <p className="rounded-lg border border-border/80 border-dashed p-4 text-xs text-muted-foreground">No recent activity yet. Leads, campaigns and outreach will appear here.</p>
         )}
       </section>
     </div>

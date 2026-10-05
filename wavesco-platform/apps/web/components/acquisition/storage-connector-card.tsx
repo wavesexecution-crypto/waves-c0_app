@@ -153,11 +153,11 @@ export function StorageConnectorCard({ initial }: Props) {
   const lastOk = connected && (storage.lastTestOk as boolean | null) === true;
 
   return (
-    <section className="rounded-lg border bg-card p-4">
+    <section className="rounded-lg border border-border/80 bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold">Client-controlled storage</h3>
-          <p className="text-xs text-muted-foreground">
+          <h3 className="font-sans text-[13px] font-semibold">Client-controlled storage</h3>
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">
             {connected
               ? `Connected to bucket “${String(storage.bucket)}”. Your leads, reports and files are stored in your own cloud storage.`
               : "Your acquisition data lives in your own cloud storage (S3-compatible). Waves runs the OS — you own the data."}
@@ -170,10 +170,10 @@ export function StorageConnectorCard({ initial }: Props) {
 
       {connected ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button type="button" disabled={busy !== "none"} onClick={onRetestPersisted} className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50">
+          <button type="button" disabled={busy !== "none"} onClick={onRetestPersisted} className="rounded-lg border border-border/80 px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50">
             {busy === "test" ? "Testing…" : "Test Connection"}
           </button>
-          <button type="button" disabled={busy !== "none"} onClick={onDisconnect} className="rounded-md border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/10 disabled:opacity-50">
+          <button type="button" disabled={busy !== "none"} onClick={onDisconnect} className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/10 disabled:opacity-50">
             {busy === "disconnect" ? "Disconnecting…" : "Disconnect"}
           </button>
           {testResult ? (
@@ -186,29 +186,29 @@ export function StorageConnectorCard({ initial }: Props) {
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <label className="block text-xs">
             <span className="text-muted-foreground">Bucket name</span>
-            <input value={bucket} onChange={(e) => setBucket(e.target.value)} placeholder="acme-company-data" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+            <input value={bucket} onChange={(e) => setBucket(e.target.value)} placeholder="acme-company-data" className="mt-1 w-full rounded-lg border border-border/80 bg-background px-3 py-2 font-sans text-[13px]" />
           </label>
           <label className="block text-xs">
             <span className="text-muted-foreground">Region</span>
-            <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="us-east-1" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+            <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="us-east-1" className="mt-1 w-full rounded-lg border border-border/80 bg-background px-3 py-2 font-sans text-[13px]" />
           </label>
           <label className="block text-xs md:col-span-2">
             <span className="text-muted-foreground">Endpoint (optional — for S3-compatible providers)</span>
-            <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://s3.eu-west-1.amazonaws.com" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+            <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://s3.eu-west-1.amazonaws.com" className="mt-1 w-full rounded-lg border border-border/80 bg-background px-3 py-2 font-sans text-[13px]" />
           </label>
           <label className="block text-xs">
             <span className="text-muted-foreground">Access key</span>
-            <input type="password" value={accessKey} onChange={(e) => setAccessKey(e.target.value)} autoComplete="off" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+            <input type="password" value={accessKey} onChange={(e) => setAccessKey(e.target.value)} autoComplete="off" className="mt-1 w-full rounded-lg border border-border/80 bg-background px-3 py-2 font-sans text-[13px]" />
           </label>
           <label className="block text-xs">
             <span className="text-muted-foreground">Secret key</span>
-            <input type="password" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} autoComplete="off" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+            <input type="password" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} autoComplete="off" className="mt-1 w-full rounded-lg border border-border/80 bg-background px-3 py-2 font-sans text-[13px]" />
           </label>
           <div className="flex gap-2 md:col-span-2">
-            <button type="button" disabled={busy !== "none"} onClick={onConnect} className="rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">
+            <button type="button" disabled={busy !== "none"} onClick={onConnect} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">
               {busy === "connect" ? "Connecting…" : busy === "test" ? "Testing…" : "Connect Storage"}
             </button>
-            <button type="button" disabled={busy !== "none"} onClick={testCandidate} className="rounded-md border px-4 py-2 text-xs font-medium hover:bg-accent disabled:opacity-50">
+            <button type="button" disabled={busy !== "none"} onClick={testCandidate} className="rounded-lg border border-border/80 px-4 py-2 text-xs font-medium hover:bg-accent disabled:opacity-50">
               Test Connection
             </button>
           </div>

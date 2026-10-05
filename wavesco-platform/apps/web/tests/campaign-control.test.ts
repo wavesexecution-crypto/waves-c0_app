@@ -1,8 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/wavesco/control", () => ({
-  requireControlAuth: vi.fn(async () => ({ tenantId: "t1", userId: "u1", session: {} as any })),
+  acquisitionDenied: vi.fn(async () => null),
+  requireControlAuth: vi.fn(async () => ({
+    tenantId: "t1",
+    userId: "u1",
+    // Launching/stopping a campaign is owner/admin-only; the route reads the
+    // role from this session, so the tests must present an owner session.
+    session: { user: { id: "u1", tenantId: "t1", role: "owner" } } as Record<string, unknown>,
+  })),
   auditControl: vi.fn(async () => ({ id: "audit1" })),
+  // Mirrors the real pure helper (same pattern as the other route tests).
+  sessionRole: (s: unknown) => {
+    const role = (s as { user?: { role?: unknown } } | null)?.user?.role;
+    return role === "owner" || role === "admin" || role === "member" ? role : "member";
+  },
 }));
 
 vi.mock("@wavesco/db", async (importActual) => {
@@ -148,15 +160,35 @@ describe("campaign control", () => {
 
   it("404 when campaign not found", async () => {
     const { withTenantContext } = await import("@wavesco/db");
-    vi.mocked(withTenantContext).mockImplementation(async (_tid: string, fn: (tx: any) => Promise<any>) => {
-      const tx: any = { campaign: { findFirst: async () => null, update: vi.fn(async () => ({})) } };
+    vi.mocked(withTenantContext).mockImplementation((async (_tid: string, fn: (tx: unknown) => Promise<unknown>) => {
+      const tx: unknown = { campaign: { findFirst: async () => null, update: vi.fn(async () => ({})) } };
       return fn(tx);
-    });
+    }) as unknown as typeof withTenantContext);
     const { POST } = await import("@/app/api/acquisition/campaigns/[id]/control/route");
     const res = await POST(
       new Request("http://test", { method: "POST", body: JSON.stringify({ action: "pause" }), headers: { "content-type": "application/json" } }),
       { params: Promise.resolve({ id: "missing" }) } as any
     );
     expect(res.status).toBe(404);
+  });
+
+  it("403 for a member role — a member cannot launch or stop a campaign", async () => {
+    const { withTenantContext } = await import("@wavesco/db");
+    const { requireControlAuth } = await import("@/lib/wavesco/control");
+    vi.mocked(withTenantContext).mockImplementation(mockWithTenantContext("draft") as never);
+    vi.mocked(requireControlAuth).mockResolvedValueOnce({
+      tenantId: "t1",
+      userId: "u2",
+      session: { user: { id: "u2", tenantId: "t1", role: "member" } },
+    } as never);
+
+    const { POST } = await import("@/app/api/acquisition/campaigns/[id]/control/route");
+    const res = await POST(
+      new Request("http://test", { method: "POST", body: JSON.stringify({ action: "launch" }), headers: { "content-type": "application/json" } }),
+      { params: Promise.resolve({ id: "c1" }) } as never
+    );
+    expect(res.status).toBe(403);
+    const json: { error?: string } = await res.json();
+    expect(json.error).toMatch(/owner or admin/i);
   });
 });

@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { Bell, Check, CheckCheck, Inbox } from "lucide-react";
 import {
   Button,
@@ -132,7 +133,7 @@ export function MilestoneNotificationCenter({
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[22rem]">
+      <DropdownMenuContent align="end" className="w-[min(22rem,calc(100vw-1rem))]">
         <div className="flex items-center justify-between px-2 py-1.5">
           <DropdownMenuLabel>Notifications</DropdownMenuLabel>
           {unreadCount > 0 ? (
@@ -145,7 +146,11 @@ export function MilestoneNotificationCenter({
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-2 py-8 text-center text-sm text-muted-foreground">
             <Inbox className="h-6 w-6" />
-            <span>No milestone notifications yet.</span>
+            <span>Nothing here yet.</span>
+            <span className="max-w-[16rem] text-xs">
+              You will be notified when leads finish generating, a campaign needs approval, a prospect replies, or a
+              report is ready.
+            </span>
           </div>
         ) : (
           notifications.slice(0, 10).map((n) => (
@@ -153,16 +158,21 @@ export function MilestoneNotificationCenter({
               key={n.id}
               className="cursor-pointer items-start gap-2 whitespace-normal py-2"
               onClick={() => void markRead(n.id)}
+              asChild
             >
-              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${EVENT_DOT_COLORS[n.eventType] ?? "bg-muted"}`} />
-              <span className="flex w-full min-w-0 flex-col gap-0.5">
-                <span className={`text-sm ${n.read ? "text-muted-foreground" : "font-semibold text-foreground"}`}>
-                  {n.title}
+              {/* The destination was loaded but never rendered, so every
+                  notification was a dead end: clicking only marked it read. */}
+              <Link href={n.resourceHref ?? "/acquisition"}>
+                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${EVENT_DOT_COLORS[n.eventType] ?? "bg-muted"}`} />
+                <span className="flex w-full min-w-0 flex-col gap-0.5">
+                  <span className={`text-sm ${n.read ? "text-muted-foreground" : "font-semibold text-foreground"}`}>
+                    {n.title}
+                  </span>
+                  <span className="line-clamp-2 text-xs text-muted-foreground">{n.message}</span>
+                  <span className="text-[11px] text-muted-foreground/70">{relativeTime(n.createdAt)}</span>
                 </span>
-                <span className="line-clamp-2 text-xs text-muted-foreground">{n.message}</span>
-                <span className="text-[11px] text-muted-foreground/70">{relativeTime(n.createdAt)}</span>
-              </span>
-              {n.read ? <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : null}
+                {n.read ? <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : null}
+              </Link>
             </DropdownMenuItem>
           ))
         )}

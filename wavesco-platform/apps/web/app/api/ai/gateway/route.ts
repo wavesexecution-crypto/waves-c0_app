@@ -19,7 +19,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
-import { prisma, withTenantContext } from "@wavesco/db";
+import { directPrisma, withTenantContext, type DB } from "@wavesco/db";
 
 const GATEWAY_TOKEN = process.env.LEAD_ENGINE_GATEWAY_TOKEN;
 
@@ -130,8 +130,10 @@ export async function POST(request: NextRequest) {
     process.env.WAVESCO_ENGINE_TENANT ??
     "wavesco-hq";
 
-  // 4. Resolve slug → tenant ID if needed (ClientAiConfig.tenantId stores the full ID)
-  const tenant = await prisma.tenant.findFirst({
+  // 4. Resolve slug → tenant ID if needed (ClientAiConfig.tenantId stores the full ID).
+  // Owner-role read: engine callers carry no tenant RLS context, so an
+  // RLS-bound lookup would always miss and every AI call would 404.
+  const tenant = await directPrisma().tenant.findFirst({
     where: { OR: [{ id: tenantRef }, { slug: tenantRef }] },
   });
   if (!tenant) {
@@ -144,7 +146,7 @@ export async function POST(request: NextRequest) {
 
   // 5. Look up ClientAiConfig for this tenant
   const config = await withTenantContext(tenantId, async (tx) => {
-    return (tx as typeof prisma).clientAiConfig.findFirst({
+    return (tx as DB).clientAiConfig.findFirst({
       where: { tenantId },
       orderBy: { createdAt: "desc" },
     });
@@ -249,7 +251,7 @@ async function logUsage(entry: {
 }): Promise<void> {
   try {
     await withTenantContext(entry.tenantId, async (tx) => {
-      await (tx as typeof prisma).aiUsageLog.create({
+      await (tx as DB).aiUsageLog.create({
         data: {
           tenantId: entry.tenantId,
           provider: entry.provider,

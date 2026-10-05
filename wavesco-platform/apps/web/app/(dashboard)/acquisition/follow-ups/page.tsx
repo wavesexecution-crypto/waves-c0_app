@@ -26,9 +26,9 @@ export default async function FollowUpsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Follow-ups</h1>
-          <p className="text-sm text-muted-foreground">
-            {pending.length} pending · {overdue.length} overdue. Reminders flow through the existing
+          <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Follow-ups</h1>
+          <p className="mt-1 max-w-3xl font-sans text-[13px] leading-5 text-muted-foreground">
+            <span className="font-mono tabular-nums text-foreground">{pending.length}</span> pending · <span className="font-mono tabular-nums text-foreground">{overdue.length}</span> overdue. Reminders flow through the existing
             Notify Hub when triggered by automations; this tracker is the source of record.
           </p>
         </div>
@@ -38,28 +38,28 @@ export default async function FollowUpsPage() {
       <FollowUpForm />
 
       {rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          <p>No follow-ups yet.</p>
-          <Link href="/acquisition/pipeline" className="mt-3 inline-block rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+        <div className="rounded-lg border border-dashed border-border/80 bg-card p-8 text-center">
+          <p className="font-sans text-[13px] text-muted-foreground">No follow-ups yet.</p>
+          <Link href="/acquisition/pipeline" className="mt-3 inline-flex rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90">
             Go to Pipeline
           </Link>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
+          <table className="w-full">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-2.5">Business</th>
-                <th className="px-4 py-2.5">Due</th>
-                <th className="px-4 py-2.5">Note</th>
-                <th className="px-4 py-2.5">Status</th>
-                <th className="px-4 py-2.5 text-right">Action</th>
+              <tr className="border-b border-border/60 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                <th className="px-4 py-2.5 font-medium">Business</th>
+                <th className="px-4 py-2.5 font-medium">Due</th>
+                <th className="px-4 py-2.5 font-medium">Note</th>
+                <th className="px-4 py-2.5 font-medium">Status</th>
+                <th className="px-4 py-2.5 text-right font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((f) => (
-                <tr key={f.id} className="border-b last:border-0 hover:bg-accent/40">
-                  <td className="px-4 py-2.5 font-medium">
+                <tr key={f.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20">
+                  <td className="px-4 py-2.5 font-sans text-[13px] font-medium text-foreground">
                     {f.leadKey ? (
                       <Link href={`/acquisition/leads/${encodeURIComponent(f.leadKey)}`} className="hover:underline">
                         {f.business}
@@ -68,12 +68,12 @@ export default async function FollowUpsPage() {
                       f.business
                     )}
                   </td>
-                  <td className={`px-4 py-2.5 text-xs ${f.status === "pending" && f.dueAt < now ? "text-red-500" : "text-muted-foreground"}`}>
+                  <td className={`px-4 py-2.5 font-mono text-[11px] tracking-[0.02em] ${f.status === "pending" && f.dueAt < now ? "text-red-500" : "text-muted-foreground"}`}>
                     {formatIST(f.dueAt)}
                     {f.status === "pending" && f.dueAt < now ? " · overdue" : ""}
                   </td>
-                  <td className="max-w-[260px] truncate px-4 py-2.5 text-xs text-muted-foreground">{f.note ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-xs">{f.status}</td>
+                  <td className="max-w-[260px] truncate px-4 py-2.5 font-sans text-[13px] text-muted-foreground">{f.note ?? "—"}</td>
+                  <td className="px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{f.status}</td>
                   <td className="px-4 py-2.5 text-right">
                     <FollowUpRowActions id={f.id} status={f.status} />
                   </td>

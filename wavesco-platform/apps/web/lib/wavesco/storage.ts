@@ -126,7 +126,13 @@ export function sanitizeStorageConfigForClient(
 const SAFE_NAME = /[^a-zA-Z0-9._-]/g;
 
 export function sanitizeSegment(seg: string, fallback: string): string {
-  const s = seg.replace(SAFE_NAME, "_").replace(/^_+|_+$/g, "");
+  // Collapse dot-runs first: keys must never contain "..", which the
+  // isTenantPath guard (correctly) rejects. Without this, generated keys
+  // for dotty filenames would fail their own guard.
+  const s = seg
+    .replace(/\.{2,}/g, "_")
+    .replace(SAFE_NAME, "_")
+    .replace(/^_+|_+$/g, "");
   return s || fallback;
 }
 

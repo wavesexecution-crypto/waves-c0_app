@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/wavesco/control", () => ({
+  acquisitionDenied: vi.fn(async () => null),
   requireControlAuth: vi.fn(async () => {
     throw new Error("UNAUTHORIZED");
   }),
@@ -14,6 +15,11 @@ vi.mock("@wavesco/db", () => ({
     activityEvent: { findMany: vi.fn() },
     auditLog: { create: vi.fn() },
   },
+}));
+
+// The route lazy-loads this; mocking keeps node:sqlite out of the test env.
+vi.mock("@/lib/wavesco/generation", () => ({
+  startGeneration: vi.fn(async () => ({ ok: true, requestId: "gen_mock" })),
 }));
 
 describe("POST /api/acquisition/documents/generate", () => {
@@ -117,27 +123,22 @@ describe("POST /api/acquisition/documents/generate", () => {
     expect(JSON.stringify(json).toLowerCase()).not.toContain("secret");
   });
 
-  it("200 with params creates new batch and audits", async () => {
+  it("200 with params delegates to the Lead Engine and audits", async () => {
     const { requireControlAuth, auditControl } = await import("@/lib/wavesco/control");
     const { withTenantContext } = await import("@wavesco/db");
+    const { startGeneration } = await import("@/lib/wavesco/generation");
     vi.mocked(requireControlAuth).mockResolvedValueOnce({ tenantId: "t1", userId: "u1", session: {} } as any);
-    const created = {
-      id: "newbatch1",
-      tenantId: "t1",
-      requestId: "gen_new123",
-      status: "queued",
-      params: { category: "Salon", city: "Pune", tier: "A", count: 10 },
-      createdAt: new Date().toISOString(),
-    };
     vi.mocked(withTenantContext).mockImplementationOnce(async (_tid: string, fn: any) => {
       const tx: any = {
-        generationBatch: {
-          findFirst: async () => null,
-          create: async ({ data }: any) => ({ ...created, ...data, id: created.id }),
-        },
+        generationBatch: { findFirst: async () => null, findUnique: async () => null },
       };
       return fn(tx);
     });
+    // The route must hand off to the one code path that actually drives the
+    // engine. Creating a GenerationBatch row here used to leave a permanent
+    // `queued` batch that nothing ever ran, which wedged the Lead Engine page.
+    vi.mocked(startGeneration).mockResolvedValueOnce({ ok: true, requestId: "gen_real123" } as never);
+
     const { POST } = await import("@/app/api/acquisition/documents/generate/route");
     const res = await POST(
       new Request("http://test", {
@@ -148,13 +149,48 @@ describe("POST /api/acquisition/documents/generate", () => {
     );
     expect(res.status).toBe(200);
     const json: any = await res.json();
-    expect(json.batchId).toBe("newbatch1");
     expect(json.status).toBe("queued");
-    expect(json.requestId).toBeDefined();
+    expect(json.requestId).toBe("gen_real123");
+    // Never a fabricated batch id.
+    expect(json.batchId).toBeUndefined();
+    expect(startGeneration).toHaveBeenCalledWith("t1", "u1", {
+      requestedCount: 10,
+      location: "Pune",
+      category: "Salon",
+      tier: "A",
+    });
     expect(auditControl).toHaveBeenCalledWith(
       expect.objectContaining({ action: "document.generate", model: "GenerationBatch" })
     );
-    // tenant-scoped: withTenantContext called with correct tenant
-    expect(withTenantContext).toHaveBeenCalledWith("t1", expect.any(Function));
+  });
+
+  it("502 and an honest error when the Lead Engine refuses to start", async () => {
+    const { requireControlAuth, auditControl } = await import("@/lib/wavesco/control");
+    const { withTenantContext } = await import("@wavesco/db");
+    const { startGeneration } = await import("@/lib/wavesco/generation");
+    vi.mocked(requireControlAuth).mockResolvedValueOnce({ tenantId: "t1", userId: "u1", session: {} } as any);
+    vi.mocked(withTenantContext).mockImplementationOnce(async (_tid: string, fn: any) => {
+      const tx: any = {
+        generationBatch: { findFirst: async () => null, findUnique: async () => null },
+      };
+      return fn(tx);
+    });
+    vi.mocked(startGeneration).mockResolvedValueOnce({ ok: false, error: "engine venv not found" } as never);
+
+    const { POST } = await import("@/app/api/acquisition/documents/generate/route");
+    const res = await POST(
+      new Request("http://test", {
+        method: "POST",
+        body: JSON.stringify({ params: { count: 5 } }),
+        headers: { "content-type": "application/json" },
+      })
+    );
+    expect(res.status).toBe(502);
+    const json: any = await res.json();
+    // Must not leak the engine's internal message.
+    expect(json.error).not.toContain("venv");
+    expect(auditControl).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "document.generate" })
+    );
   });
 });

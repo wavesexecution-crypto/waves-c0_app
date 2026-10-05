@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 import {
   buildRuntimeStorageConfig,
@@ -34,6 +34,8 @@ function isUnauthorized(e: unknown): boolean {
 export async function GET(request: Request) {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const url = new URL(request.url);
     const kind = url.searchParams.get("kind");
     const prefix = kind ? tenantStoragePath(tenantId, kind, "") : `tenants/${tenantId}/`;
@@ -62,6 +64,8 @@ export async function GET(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const body = (await request.json().catch(() => ({}))) as { key?: string };
 
     if (typeof body.key !== "string" || !body.key) {

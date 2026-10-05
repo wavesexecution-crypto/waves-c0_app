@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 import {
   normalizeBucket,
@@ -40,6 +40,8 @@ function isUnauthorized(e: unknown): boolean {
 export async function POST(req: Request) {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
     let cfg: StorageConfig | null = null;

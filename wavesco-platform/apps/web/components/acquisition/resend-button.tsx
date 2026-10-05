@@ -13,11 +13,19 @@ export function ResendButton({ batchId }: { batchId: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent disabled:opacity-50"
+        // Sends the report to a third-party channel — confirm before doing it.
+        onClick={(e) => {
+          if (!window.confirm("Send this batch's PDF and spreadsheet to Telegram?")) e.preventDefault();
+        }}
+        className="rounded-lg border border-border/80 px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent disabled:opacity-50"
       >
         {pending ? "Sending…" : "Send to Telegram"}
       </button>
-      {state.error ? <span className="text-[11px] text-red-500">{state.error}</span> : null}
+      {state.error ? (
+        <span className="max-w-[160px] truncate text-[11px] text-red-500" title={state.error}>
+          {state.error}
+        </span>
+      ) : null}
       {state.ok ? <span className="text-[11px] text-emerald-600 dark:text-emerald-400">{state.message}</span> : null}
     </form>
   );

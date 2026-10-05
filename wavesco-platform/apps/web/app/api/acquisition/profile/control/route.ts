@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireControlAuth, auditControl } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth, auditControl } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 import { readinessCheck, nextStatusForAction } from "@/lib/wavesco/acquisition-profile";
 
@@ -15,6 +15,8 @@ function isUnauthorized(e: unknown): boolean {
 export async function POST(req: Request) {
   try {
     const { tenantId, userId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const body = await req.json().catch(() => ({}));
     const action = (body as any)?.action as string;
 

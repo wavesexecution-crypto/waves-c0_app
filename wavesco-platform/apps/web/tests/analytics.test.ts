@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/wavesco/control", () => ({
+  acquisitionDenied: vi.fn(async () => null),
   requireControlAuth: vi.fn(async () => {
     throw new Error("UNAUTHORIZED");
   }),

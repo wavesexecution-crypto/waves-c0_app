@@ -18,7 +18,7 @@ function Btn({
     <button
       type="submit"
       disabled={pending}
-      className={`rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
+      className={`rounded-lg border border-border/80 px-3 py-1.5 font-sans text-[13px] font-medium disabled:opacity-50 ${
         tone === "primary" ? "bg-primary text-primary-foreground hover:bg-primary/90 border-transparent" : "hover:bg-accent"
       }`}
     >
@@ -50,7 +50,7 @@ export function LeadDetailActions({ nameKey }: { nameKey: string }) {
             alert("Qualify: lead qualification is derived from research + email check + tier/score. Run Enrich + Verify first.");
           }}
         >
-          <button type="submit" className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
+          <button type="submit" className="rounded-lg border border-border/80 px-3 py-1.5 font-sans text-[13px] hover:bg-accent">
             Qualify
           </button>
         </form>
@@ -59,7 +59,7 @@ export function LeadDetailActions({ nameKey }: { nameKey: string }) {
             alert("Score: lead_score + digital_score + tier are engine-computed. Re-research to refresh.");
           }}
         >
-          <button type="submit" className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
+          <button type="submit" className="rounded-lg border border-border/80 px-3 py-1.5 font-sans text-[13px] hover:bg-accent">
             Score
           </button>
         </form>

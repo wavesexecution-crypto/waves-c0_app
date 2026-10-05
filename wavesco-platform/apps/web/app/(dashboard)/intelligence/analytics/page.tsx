@@ -2,27 +2,23 @@ import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
-import {
-  getCountsBy,
-  getLeadStats,
-  listBatchManifests,
-} from "@/lib/wavesco/lead-engine";
+import { getCountsBy, getLeadStats, listBatchManifests } from "@/lib/wavesco/lead-engine";
 import { formatIST } from "@/lib/wavesco/time";
+import { PageHeader, Section, Stat, StatGroup, Hairline, StatusDot } from "@/components/premium";
+import { safeErrorText } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Analytics" };
 
-function Bar({ label, value, max }: { label: string; value: number; max: number }) {
+function BarRow({ label, value, max }: { label: string; value: number; max: number }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <div className="flex items-center gap-3 text-sm">
-      <span className="w-40 shrink-0 truncate text-muted-foreground">{label}</span>
-      <span className="h-2 flex-1 overflow-hidden rounded bg-muted">
-        <span
-          className="block h-full rounded bg-primary/70"
-          style={{ width: `${max > 0 ? Math.round((value / max) * 100) : 0}%` }}
-        />
+    <div className="flex items-center gap-4 py-2">
+      <span className="w-36 shrink-0 truncate text-sm text-foreground">{label}</span>
+      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+        <span className="block h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
       </span>
-      <span className="w-10 shrink-0 text-right tabular-nums">{value}</span>
+      <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums text-foreground">{value}</span>
     </div>
   );
 }
@@ -36,7 +32,7 @@ export default async function AnalyticsPage() {
   try {
     stats = await getLeadStats();
   } catch (e) {
-    corpusError = e instanceof Error ? e.message : "Lead Engine unreachable";
+    corpusError = safeErrorText(e, "The lead database is temporarily unavailable. Metrics return automatically.", "leads:corpus");
   }
 
   const byTier = stats ? await getCountsBy("tier") : {};
@@ -68,93 +64,109 @@ export default async function AnalyticsPage() {
   const cityMax = Math.max(1, ...cityEntries.map(([, v]) => v));
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
-        <p className="text-sm text-muted-foreground">
-          Aggregates computed server-side at request time from the lead database and PostgreSQL. No sampling,
-          no estimates.
-        </p>
-      </div>
+    <div className="animate-fade-in">
+      <PageHeader
+        eyebrow="Intelligence"
+        title="Analytics"
+        description="A clear view of acquisition performance � where leads are, what''s ready, and what needs attention. Computed live from your lead database and workspace."
+        actions={!corpusError ? <StatusDot state="live" label="Live" /> : <StatusDot state="alert" label="Corpus offline" />}
+      />
 
-      {!stats ? (
-        <div className="rounded-lg border border-dashed border-red-500/40 p-6 text-sm">
-          <p className="font-medium">Corpus analytics unavailable</p>
-          <p className="text-muted-foreground">{corpusError}</p>
-        </div>
-      ) : (
-        <>
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              ["Total leads", stats.total],
-              ["Email ready", stats.emailReady],
-              ["Contacted", stats.contacted],
-              ["Replies", stats.replies],
-            ].map(([l, v]) => (
-              <div key={String(l)} className="rounded-lg border bg-card p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{l}</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{v}</p>
+      <div className="mx-auto max-w-[1280px] px-6 py-8 sm:px-8 lg:px-8">
+        {!stats ? (
+          <div className="border border-border/60 bg-card p-8">
+            <p className="text-sm font-medium">Corpus analytics unavailable</p>
+            <p className="mt-1 text-sm text-muted-foreground">{corpusError}</p>
+          </div>
+        ) : (
+          <>
+            <Section title="Overview" description="What''s in your lead system right now">
+              <StatGroup>
+                <Stat label="Total leads" value={stats.total} hint="Across all categories and cities" />
+                <Stat label="Email ready" value={stats.emailReady} hint="Qualified for outreach" />
+                <Stat label="Contacted" value={stats.contacted} hint="Outreach sent" />
+                <Stat label="Replies" value={stats.replies} hint="Awaiting classification" />
+              </StatGroup>
+            </Section>
+
+            <Hairline />
+
+            <div className="grid gap-8 py-8 lg:grid-cols-3 lg:gap-12">
+              <section>
+                <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  By tier
+                </h3>
+                <div className="mt-4 divide-y divide-border/60 border-y border-border/60">
+                  {Object.entries(byTier).map(([t, v]) => (
+                    <BarRow key={t} label={`Tier ${t}`} value={v} max={tierMax} />
+                  ))}
+                </div>
+                <p className="mt-3 font-mono text-xs text-muted-foreground">Tier reflects lead quality and enrichment.</p>
+              </section>
+
+              <section>
+                <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Top categories
+                </h3>
+                <div className="mt-4 divide-y divide-border/60 border-y border-border/60">
+                  {catEntries.map(([c, v]) => (
+                    <BarRow key={c} label={c} value={v} max={catMax} />
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Top cities
+                </h3>
+                <div className="mt-4 divide-y divide-border/60 border-y border-border/60">
+                  {cityEntries.map(([c, v]) => (
+                    <BarRow key={c} label={c} value={v} max={cityMax} />
+                  ))}
+                </div>
+              </section>
+            </div>
+
+            <Hairline />
+
+            <Section title="Funnel" description="Campaign to follow-up � where work is">
+              <div className="grid gap-px bg-border/60">
+                <div className="grid gap-px bg-border/60 sm:grid-cols-5">
+                  {[
+                    ["Campaigns", platform.campaigns],
+                    ["Queued", platform.emails],
+                    ["Sent", platform.emailsSent],
+                    ["Follow-ups", platform.followUps],
+                    ["Activity 7d", platform.activity7d],
+                  ].map(([l, v]) => (
+                    <div key={String(l)} className="bg-card p-6">
+                      <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{l}</p>
+                      <p className="mt-2 text-[22px] font-semibold tracking-[-0.015em] text-foreground">{v as number}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </section>
+            </Section>
 
-          <section className="grid gap-6 lg:grid-cols-3">
-            <div className="space-y-2 rounded-lg border bg-card p-4">
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">By tier</h2>
-              {Object.entries(byTier).map(([t, v]) => (
-                <Bar key={t} label={`Tier ${t}`} value={v} max={tierMax} />
-              ))}
-            </div>
-            <div className="space-y-2 rounded-lg border bg-card p-4">
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Top categories</h2>
-              {catEntries.map(([c, v]) => (
-                <Bar key={c} label={c} value={v} max={catMax} />
-              ))}
-            </div>
-            <div className="space-y-2 rounded-lg border bg-card p-4">
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Top cities</h2>
-              {cityEntries.map(([c, v]) => (
-                <Bar key={c} label={c} value={v} max={cityMax} />
-              ))}
-            </div>
-          </section>
-        </>
-      )}
+            <Hairline />
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Platform funnel</h2>
-        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {[
-            ["Campaigns", platform.campaigns],
-            ["Queued emails", platform.emails],
-            ["Sent", platform.emailsSent],
-            ["Follow-ups", platform.followUps],
-            ["Activity (7d)", platform.activity7d],
-          ].map(([l, v]) => (
-            <div key={String(l)} className="rounded-lg border bg-card p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">{l}</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{v}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {manifests.length > 0 ? (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Recent batches</h2>
-          <ul className="divide-y rounded-lg border bg-card">
-            {manifests.map((m) => (
-              <li key={m.batchId} className="flex items-center justify-between px-4 py-2 text-sm">
-                <span className="font-mono text-xs">{m.batchId}</span>
-                <span className="text-xs text-muted-foreground">
-                  {m.leadCount ?? "?"} leads · {formatIST(m.generatedAt ?? null)} · telegram{" "}
-                  {m.telegramDeliveryStatus ?? "—"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+            {manifests.length > 0 ? (
+              <Section title="Recent batches" description="Latest Lead Engine runs � lead report and delivery">
+                <div className="divide-y divide-border/60 border-y border-border/60">
+                  {manifests.map((m) => (
+                    <div key={m.batchId} className="flex flex-col gap-2 bg-card px-0 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="font-mono text-sm text-foreground">{m.batchId}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {m.leadCount ?? "?"} leads � {formatIST(m.generatedAt ?? null)} � telegram {m.telegramDeliveryStatus ?? "�"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            ) : null}
+          </>
+        )}
+      </div>
     </div>
   );
 }

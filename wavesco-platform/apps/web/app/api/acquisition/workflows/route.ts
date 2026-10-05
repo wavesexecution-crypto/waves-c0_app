@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth } from "@/lib/wavesco/control";
 import { n8nBaseUrl, n8nApiKey, getWorkflows, getExecutions, readAutomationManifest } from "@/lib/wavesco/n8n";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await requireControlAuth();
+    const gate = await requireControlAuth();
+    const denied = await acquisitionDenied(gate.tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const digest = (e as { digest?: string })?.digest as string | undefined;

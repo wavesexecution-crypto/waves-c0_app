@@ -71,17 +71,17 @@ export function DocumentsGenerateControl() {
   }
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="rounded-lg border border-border/80 bg-card p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium">Generate Documents</h3>
-          <p className="text-xs text-muted-foreground">Queue a new GenerationBatch — tenant-scoped, audit-logged. Produces PDF/XLSX via Lead Engine.</p>
+          <h3 className="font-sans text-[13px] font-medium">Generate Documents</h3>
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">Queue a new GenerationBatch — tenant-scoped, audit-logged. Produces PDF/XLSX via Lead Engine.</p>
         </div>
         <button
           type="button"
           onClick={handleQuickGenerate}
           disabled={pending}
-          className="rounded-md border bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+          className="rounded-lg border border-border/80 bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
         >
           {pending ? "Queuing…" : "Quick Generate (10)"}
         </button>
@@ -94,7 +94,7 @@ export function DocumentsGenerateControl() {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             placeholder="Salon, Clinic…"
-            className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]"
           />
         </label>
         <label className="text-xs">
@@ -103,7 +103,7 @@ export function DocumentsGenerateControl() {
             value={city}
             onChange={(e) => setCity(e.target.value)}
             placeholder="Pune, Mumbai…"
-            className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]"
           />
         </label>
         <label className="text-xs">
@@ -111,7 +111,7 @@ export function DocumentsGenerateControl() {
           <select
             value={tier}
             onChange={(e) => setTier(e.target.value)}
-            className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]"
           >
             <option value="all">all</option>
             <option value="A">A</option>
@@ -127,18 +127,18 @@ export function DocumentsGenerateControl() {
             max={60}
             value={count}
             onChange={(e) => setCount(Number(e.target.value) || 0)}
-            className="mt-1 w-full rounded-md border bg-transparent px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]"
           />
         </label>
         <div className="sm:col-span-4 flex items-center gap-2">
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-1.5 font-sans text-[13px] font-medium text-primary-foreground disabled:opacity-50"
           >
             {pending ? "Queuing…" : "Generate"}
           </button>
-          <span className="text-xs text-muted-foreground">Creates GenerationBatch queued → engine pipeline.</span>
+          <span className="font-sans text-[13px] leading-5 text-muted-foreground">Creates GenerationBatch queued → engine pipeline.</span>
         </div>
       </form>
 

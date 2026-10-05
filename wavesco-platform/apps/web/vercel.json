@@ -1,3 +1,10 @@
 {
-  "buildCommand": "pnpm --filter @wavesco/db db:generate && next build && node scripts/copy-prisma-engine.mjs"
+  "buildCommand": "pnpm --filter @wavesco/db db:generate && next build && node scripts/copy-prisma-engine.mjs",
+  "crons": [
+    {
+      "path": "/api/cron/reconcile",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
+

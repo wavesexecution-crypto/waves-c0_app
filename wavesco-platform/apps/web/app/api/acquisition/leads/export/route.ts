@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { auditControl, requireControlAuth } from "@/lib/wavesco/control";
-import { withTenantContext } from "@wavesco/db";
+import { acquisitionDenied, auditControl, requireControlAuth } from "@/lib/wavesco/control";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
     const { tenantId, userId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
 
     let body: Record<string, unknown> = {};
     try {
@@ -25,54 +26,38 @@ export async function POST(req: Request) {
     const tier = typeof body.tier === "string" ? body.tier.trim() : undefined;
     const category = typeof body.category === "string" ? body.category.trim() : undefined;
     const city = typeof body.city === "string" ? body.city.trim() : undefined;
-    const outreach = typeof body.outreach === "string" ? body.outreach.trim() : undefined;
+    const outreachRaw = typeof body.outreach === "string" ? body.outreach.trim() : "";
+    const outreach = ["contacted", "uncontacted", "opted_out", "replied"].includes(outreachRaw)
+      ? (outreachRaw as "contacted" | "uncontacted" | "opted_out" | "replied")
+      : undefined;
     const limitRaw = typeof body.limit === "number" ? (body.limit as number) : 1000;
     const limit = Math.min(Math.max(Math.trunc(limitRaw) || 1000, 1), 1000);
 
-    // Build Prisma where with tenant RLS
-    const where: Record<string, unknown> = { tenantId };
-    if (q) {
-      (where as Record<string, unknown>).OR = [
-        { business: { contains: q, mode: "insensitive" } },
-        { category: { contains: q, mode: "insensitive" } },
-        { city: { contains: q, mode: "insensitive" } },
-        { area: { contains: q, mode: "insensitive" } },
-        { email: { contains: q, mode: "insensitive" } },
-      ];
-    }
-    if (tier && tier !== "all" && tier !== "") (where as Record<string, unknown>).tier = tier;
-    if (category && category !== "all" && category !== "") (where as Record<string, unknown>).category = category;
-    if (city && city !== "all" && city !== "") (where as Record<string, unknown>).city = city;
-    // outreach filter: map to email/verification if needed; keep for audit only
-
-    const rows = await withTenantContext(tenantId, async (tx: any) => {
-      return tx.leadResearch.findMany({
-        where,
-        take: limit,
-        orderBy: { leadScore: "desc" },
-        select: {
-          business: true,
-          category: true,
-          city: true,
-          area: true,
-          tier: true,
-          leadScore: true,
-          email: true,
-          website: true,
-          rating: true,
-          reviews: true,
-        },
-      });
+    // Export the SAME dataset the Leads table renders. This previously queried
+    // the tenant's LeadResearch snapshots while the page shows the Lead Engine
+    // corpus, so a client could filter Tier A in Pune, see 25 rows, and export a
+    // header-only file — or an entirely different set.
+    const { listLeads } = await import("@/lib/wavesco/lead-engine");
+    const { rows, total } = await listLeads({
+      search: q || undefined,
+      tier: tier && tier !== "all" ? tier : undefined,
+      category: category && category !== "all" ? category : undefined,
+      city: city && city !== "all" ? city : undefined,
+      outreach,
+      sort: "score",
+      page: 1,
+      pageSize: limit,
     });
 
     await auditControl({
       tenantId,
       userId,
       action: "leads.export",
-      model: "LeadResearch",
+      model: "LeadCorpus",
       metadata: {
-        filters: { q: q || undefined, tier, category, city, outreach, limit },
+        filters: { q: q || undefined, tier, category, city, outreach: outreach ?? undefined, limit },
         count: rows.length,
+        totalMatching: total,
       },
     });
 
@@ -84,6 +69,7 @@ export async function POST(req: Request) {
       "tier",
       "leadScore",
       "email",
+      "email_status",
       "website",
       "rating",
       "reviews",
@@ -96,10 +82,15 @@ export async function POST(req: Request) {
       return s;
     };
 
-    const csvRows = (rows as Record<string, unknown>[]).map((r) =>
+    const csvRows = (rows as unknown as Record<string, unknown>[]).map((r) =>
       header.map((h) => escape(r[h])).join(",")
     );
-    const csv = [header.join(","), ...csvRows].join("\n");
+    // When the filter matches more rows than the cap, say so inside the file —
+    // a silently truncated export reads as "these are all your leads".
+    const truncated = total > rows.length
+      ? [`# Exported the top ${rows.length} of ${total} matching leads by score. Narrow the filters to see the rest.`]
+      : [];
+    const csv = [header.join(","), ...csvRows, ...truncated].join("\n");
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 
@@ -108,6 +99,9 @@ export async function POST(req: Request) {
       headers: {
         "content-type": "text/csv; charset=utf-8",
         "content-disposition": `attachment; filename="leads-export-${timestamp}.csv"`,
+        "x-total-rows": String(total ?? rows.length),
+        "x-exported-rows": String(rows.length),
+        "x-truncated": total > rows.length ? "true" : "false",
         "cache-control": "no-store",
       },
     });
@@ -122,6 +116,10 @@ export async function POST(req: Request) {
     if (isUnauthorized) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({ error: "internal", detail: msg }, { status: 500 });
+    console.error("[leads:export] failed", e);
+    return NextResponse.json(
+      { error: "We could not export your leads. Try again in a moment." },
+      { status: 500 }
+    );
   }
 }

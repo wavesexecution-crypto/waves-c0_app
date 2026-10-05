@@ -171,17 +171,18 @@ export default async function EmailControlPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Email Control</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Communication</p>
+          <h1 className="mt-1 font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Email Control</h1>
+          <p className="mt-1.5 max-w-2xl font-sans text-[13px] leading-5 text-muted-foreground">
             Manage templates, preview renders without sending, inspect campaigns grouped by campaignId, inspect delivery state (submitted/approved/sent/failed + sendError), and configure Brevo sending integration — server-side only, audit-logged.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={15_000} />
           <StatusPill state={brevoStatus === "ok" ? "connected" : brevoStatus === "BLOCKED" ? "disconnected" : "error"} />
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">Brevo {brevoStatus}</span>
+          <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Brevo {brevoStatus}</span>
         </div>
       </div>
 
@@ -189,41 +190,41 @@ export default async function EmailControlPage() {
       <EmailModeSelector initialMode={emailMode} />
 
       {/* Sending Integration — Brevo */}
-      <section className="rounded-lg border bg-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <section className="rounded-lg border border-border/80 bg-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-sm font-semibold">Sending Integration — Brevo / SMTP</h2>
-            <p className="text-xs text-muted-foreground">Brevo API key is server-side only (env: BREVO_API_KEY via credentialRef). Test Connection is server-side and never leaks the key; URLs are masked. For SMTP outbox, delivery goes via n8n Email Outbox.</p>
+            <h2 className="font-sans text-[13px] font-semibold tracking-[-0.01em] text-foreground">Sending Integration — Brevo / SMTP</h2>
+            <p className="font-sans text-[13px] leading-5 text-muted-foreground">Brevo API key is server-side only (env: BREVO_API_KEY via credentialRef). Test Connection is server-side and never leaks the key; URLs are masked. For SMTP outbox, delivery goes via n8n Email Outbox.</p>
             <p className="mt-1 font-mono text-xs">
               Status: <StatusPill state={brevoStatus === "ok" ? "connected" : "disconnected"} /> <span className="ml-2">{brevoDetail}</span>
             </p>
-            {brevoReason && brevoReason !== brevoDetail ? <p className="text-[11px] text-muted-foreground">Reason: {brevoReason}</p> : null}
-            <p className="mt-1 text-[11px] text-muted-foreground">Key: <span className="font-mono">BREVO_API_KEY</span> — masked, never exposed to browser. Health via <code className="rounded bg-muted px-1 py-0.5">getIntegrationsHealth</code> + <code className="rounded bg-muted px-1 py-0.5">brevoHealth()</code>.</p>
+            {brevoReason && brevoReason !== brevoDetail ? <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Reason: {brevoReason}</p> : null}
+            <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Key: <span className="font-mono">BREVO_API_KEY</span> — masked, never exposed to browser. Health via <code className="rounded bg-muted px-1 py-0.5">getIntegrationsHealth</code> + <code className="rounded bg-muted px-1 py-0.5">brevoHealth()</code>.</p>
           </div>
           <div className="flex flex-col items-end gap-2">
             <TestConnectionButton integrationKey="brevo" label="Brevo" />
-            <Link href="/acquisition/integrations" className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+            <Link href="/acquisition/integrations" className="rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
               Open Integrations
             </Link>
           </div>
         </div>
         {brevoStatus === "BLOCKED" ? (
-          <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+          <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
             <p className="font-medium text-amber-800 dark:text-amber-200">Brevo not configured</p>
             <p className="text-amber-800/80 dark:text-amber-200/80">Set <span className="font-mono">BREVO_API_KEY</span> server-side (env or credentialRef). Until then, sending integration Test returns BLOCKED without leaking secrets; outreach still queues via Approval → Email Outbox → SMTP path.</p>
           </div>
         ) : null}
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-md border bg-muted/20 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Policy</p>
+          <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Policy</p>
             <p className="mt-1 text-xs">Dashboard never exposes provider keys to browser; all sends are server-side via Brevo/SMTP, audit-logged.</p>
           </div>
-          <div className="rounded-md border bg-muted/20 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Test</p>
+          <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Test</p>
             <p className="mt-1 text-xs">Test Connection hits <code className="rounded bg-muted px-1">/api/acquisition/integrations/test</code> with <span className="font-mono">key=brevo</span> — server-side Brevo <code className="rounded bg-muted px-1">/v3/account</code> probe.</p>
           </div>
-          <div className="rounded-md border bg-muted/20 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Delivery</p>
+          <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Delivery</p>
             <p className="mt-1 text-xs">Delivery state below shows real <span className="font-mono">OutreachEmail.status</span> + <span className="font-mono">sendError</span> and OutreachOrder <span className="font-mono">deliveryStatus</span>.</p>
           </div>
         </div>
@@ -232,17 +233,17 @@ export default async function EmailControlPage() {
       {/* Templates */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Templates — List / Create / Update / Preview</h2>
-          <Link href="/acquisition/outreach" className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+          <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Templates — List / Create / Update / Preview</h2>
+          <Link href="/acquisition/outreach" className="rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
             Go to Outreach
           </Link>
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="font-sans text-[13px] leading-5 text-muted-foreground">
           Status: <StatusPill state={templatesStatus === "ok" ? "connected" : "disconnected"} /> <span className="ml-2">{templatesStatus}</span>
           {templatesReason ? <span className="ml-2 text-[11px]">— {templatesReason.slice(0, 120)}</span> : null} · {templates.length} templates · API <code className="rounded bg-muted px-1 py-0.5">/api/acquisition/email/templates</code> with RLS tenant scoping, auditControl.
         </p>
         <EmailTemplateControls initialTemplates={templates} />
-        <div className="rounded-md border bg-muted/20 p-3 text-xs">
+        <div className="rounded-lg border border-border/80 bg-muted/20 p-3 text-xs">
           <p className="font-medium">How preview works</p>
           <p className="text-muted-foreground">Preview calls <code className="rounded bg-muted px-1">POST /api/acquisition/email/templates</code> with <span className="font-mono">{"{ action: \"preview\", template: { subject, body }, vars: { business, city } }"}</span>. Server renders <code className="rounded bg-muted px-1">{"{{business}}"}</code> / <code className="rounded bg-muted px-1">{"{{city}}"}</code> via pure string replace, writes <span className="font-mono">AuditLog action=email.template.preview model=EmailTemplate</span> without sending. No SMTP/Brevo call is made during preview.</p>
           <p className="mt-2 font-mono text-[11px] text-muted-foreground">Example: subject &quot;Hello {"{{business}}"}&quot; with vars {"{ business: \"Acme\", city: \"Pune\" }"} → &quot;Hello Acme&quot;; body &quot;Hi {"{{business}}"} in {"{{city}}"}&quot; → &quot;Hi Acme in Pune&quot;</p>
@@ -251,21 +252,21 @@ export default async function EmailControlPage() {
 
       {/* Inspect Campaigns — grouped by campaignId */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Inspect Campaigns — OutreachEmail grouped by campaignId</h2>
+        <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Inspect Campaigns — OutreachEmail grouped by campaignId</h2>
         {emailError ? (
-          <div className="rounded-md border border-red-500/30 bg-red-500/5 p-3 text-xs">
+          <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs">
             <p className="font-medium text-red-600 dark:text-red-400">Failed to load outreach</p>
             <p className="text-muted-foreground">{emailError}</p>
           </div>
         ) : byCampaign.size === 0 ? (
-          <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border/80 p-6 text-center text-sm text-muted-foreground">
             No campaigns with outreach yet. Campaigns are created under Campaigns; OutreachEmail rows group by <span className="font-mono">campaignId</span> once queued via Approval Queue.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          <div className="overflow-x-auto rounded-lg border border-border/80 bg-card">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/20 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-border/60 bg-muted/20 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                   <th className="px-3 py-2">Campaign</th>
                   <th className="px-3 py-2">CampaignId</th>
                   <th className="px-3 py-2">Total</th>
@@ -280,7 +281,7 @@ export default async function EmailControlPage() {
                   const rate = v.count > 0 ? Math.round((v.sent / v.count) * 100) : 0;
                   const label = cid === "__no_campaign__" ? "(no campaign)" : (v.campaignName ?? cid.slice(0, 12) + ".");
                   return (
-                    <tr key={cid} className="border-b last:border-0 hover:bg-accent/40">
+                    <tr key={cid} className="border-b border-border/60 last:border-0 hover:bg-card-hover">
                       <td className="px-3 py-2 text-xs font-medium">{label}</td>
                       <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">{cid === "__no_campaign__" ? "-" : cid}</td>
                       <td className="px-3 py-2 tabular-nums">{v.count}</td>
@@ -316,8 +317,8 @@ export default async function EmailControlPage() {
 
       {/* Delivery State Inspection */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Delivery State — Inspect (submitted / approved / sent / failed + sendError)</h2>
-        <p className="text-xs text-muted-foreground">Real statuses from <span className="font-mono">OutreachEmail.status</span> and <span className="font-mono">OutreachOrder.deliveryStatus / sendError</span>. No fake telemetry; failed rows surface <span className="font-mono">error / sendError</span> verbatim.</p>
+        <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Delivery State — Inspect (submitted / approved / sent / failed + sendError)</h2>
+        <p className="font-sans text-[13px] leading-5 text-muted-foreground">Real statuses from <span className="font-mono">OutreachEmail.status</span> and <span className="font-mono">OutreachOrder.deliveryStatus / sendError</span>. No fake telemetry; failed rows surface <span className="font-mono">error / sendError</span> verbatim.</p>
 
         <div className="grid gap-3 sm:grid-cols-4">
           {[
@@ -329,21 +330,21 @@ export default async function EmailControlPage() {
             const count = byStatus.get(s.key) ?? 0;
             const orderCount = orderByStatus.get(s.key) ?? 0;
             return (
-              <div key={s.key} className="rounded-lg border bg-card p-3 text-center">
+              <div key={s.key} className="rounded-lg border border-border/80 bg-card p-3 text-center">
                 <StatusPill state={pillForStatus(s.key)} />
                 <p className="mt-1.5 text-xl font-semibold tabular-nums">{count}</p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{s.label} (OutreachEmail)</p>
-                {orderCount > 0 ? <p className="text-[11px] text-muted-foreground">Orders: {orderCount}</p> : null}
+                <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{s.label} (OutreachEmail)</p>
+                {orderCount > 0 ? <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Orders: {orderCount}</p> : null}
               </div>
             );
           })}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border bg-card">
-            <div className="border-b p-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide">OutreachEmail — by status</h3>
-              <p className="text-[11px] text-muted-foreground">{emails.length} total · tenant-scoped via withTenantContext</p>
+          <div className="rounded-lg border border-border/80 bg-card">
+            <div className="border-b border-border/60 p-3">
+              <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">OutreachEmail — by status</h3>
+              <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{emails.length} total · tenant-scoped via withTenantContext</p>
             </div>
             {emails.length === 0 ? (
               <p className="p-6 text-center text-xs text-muted-foreground">No OutreachEmail rows.</p>
@@ -351,7 +352,7 @@ export default async function EmailControlPage() {
               <div className="max-h-[320px] overflow-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b text-left uppercase tracking-wide text-muted-foreground">
+                    <tr className="border-b border-border/60 text-left uppercase tracking-wide text-muted-foreground">
                       <th className="px-3 py-2">Business</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">sendError / error</th>
@@ -359,7 +360,7 @@ export default async function EmailControlPage() {
                   </thead>
                   <tbody>
                     {emails.slice(0, 20).map((e) => (
-                      <tr key={e.id} className="border-b last:border-0 hover:bg-accent/30">
+                      <tr key={e.id} className="border-b border-border/60 last:border-0 hover:bg-card-hover">
                         <td className="px-3 py-2">
                           <span className="font-medium">{e.business}</span>
                           <span className="block font-mono text-[11px] text-muted-foreground">{e.email}</span>
@@ -392,10 +393,10 @@ export default async function EmailControlPage() {
             )}
           </div>
 
-          <div className="rounded-lg border bg-card">
-            <div className="border-b p-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide">OutreachOrder — deliveryState</h3>
-              <p className="text-[11px] text-muted-foreground">{outreachOrders.length} total · includes sendError, deliveryStatus, replyStatus</p>
+          <div className="rounded-lg border border-border/80 bg-card">
+            <div className="border-b border-border/60 p-3">
+              <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">OutreachOrder — deliveryState</h3>
+              <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{outreachOrders.length} total · includes sendError, deliveryStatus, replyStatus</p>
             </div>
             {outreachOrders.length === 0 ? (
               <p className="p-6 text-center text-xs text-muted-foreground">No OutreachOrder rows yet — orders are created via pipeline enrichment/qualification.</p>
@@ -403,7 +404,7 @@ export default async function EmailControlPage() {
               <div className="max-h-[320px] overflow-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b text-left uppercase tracking-wide text-muted-foreground">
+                    <tr className="border-b border-border/60 text-left uppercase tracking-wide text-muted-foreground">
                       <th className="px-3 py-2">Business</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">deliveryStatus / sendError</th>
@@ -411,7 +412,7 @@ export default async function EmailControlPage() {
                   </thead>
                   <tbody>
                     {outreachOrders.slice(0, 20).map((o) => (
-                      <tr key={o.id} className="border-b last:border-0 hover:bg-accent/30">
+                      <tr key={o.id} className="border-b border-border/60 last:border-0 hover:bg-card-hover">
                         <td className="px-3 py-2">
                           <span className="font-medium">{o.businessName ?? o.business}</span>
                           <span className="block font-mono text-[11px] text-muted-foreground">{o.email}</span>
@@ -429,7 +430,7 @@ export default async function EmailControlPage() {
                               {String(o.sendError).slice(0, 120)}
                             </span>
                           ) : null}
-                          {o.replyStatus ? <span className="block text-[11px] text-muted-foreground">reply: {String(o.replyStatus)}</span> : null}
+                          {o.replyStatus ? <span className="block font-mono text-[11px] tracking-[0.02em] text-muted-foreground">reply: {String(o.replyStatus)}</span> : null}
                           <span className="block font-mono text-[10px] text-muted-foreground">
                             submitted {formatIST(o.submittedAt)} · sent {formatIST(o.sentAt)}
                           </span>
@@ -444,7 +445,7 @@ export default async function EmailControlPage() {
         </div>
 
         {(failedEmails.length > 0 || failedOrders.length > 0) ? (
-          <div className="rounded-md border border-red-500/30 bg-red-500/5 p-3">
+          <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3">
             <p className="text-xs font-medium text-red-600 dark:text-red-400">Failed deliveries — inspect sendError</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-[11px]">
               {failedEmails.slice(0, 5).map((e) => (
@@ -460,22 +461,22 @@ export default async function EmailControlPage() {
             </ul>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">No failures to inspect — healthy queue.</p>
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">No failures to inspect — healthy queue.</p>
         )}
 
-        <p className="text-[11px] text-muted-foreground">
+        <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
           Note: &quot;approved&quot; means the decision reached the decide endpoint; &quot;sent&quot; is set only when dispatch via Email Outbox / Brevo is confirmed. Bounce/reply telemetry is shown via OutreachOrder.replyStatus when available; otherwise delivery/bounce is not fabricated.
         </p>
       </section>
 
       <div className="flex gap-2">
-        <Link href="/acquisition/outreach" className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+        <Link href="/acquisition/outreach" className="rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
           View Outreach Pipeline
         </Link>
-        <Link href="/acquisition/campaigns" className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent">
+        <Link href="/acquisition/campaigns" className="rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
           View Campaigns
         </Link>
-        <Link href="/acquisition/integrations" className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+        <Link href="/acquisition/integrations" className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
           Integrations Health
         </Link>
       </div>

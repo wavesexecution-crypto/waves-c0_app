@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/wavesco/control", () => ({
+  acquisitionDenied: vi.fn(async () => null),
   requireControlAuth: vi.fn(async () => {
     throw new Error("UNAUTHORIZED");
   }),
@@ -53,7 +54,7 @@ describe("GET /api/acquisition/agents", () => {
     const { requireControlAuth } = await import("@/lib/wavesco/control");
     vi.mocked(requireControlAuth).mockRejectedValueOnce(new Error("UNAUTHORIZED"));
     const { GET } = await import("@/app/api/acquisition/agents/route");
-    const res = await GET(new Request("http://test"));
+    const res = await GET();
     expect(res.status).toBe(401);
     const json: any = await res.json().catch(() => ({}));
     expect(json.error).toBeDefined();
@@ -67,7 +68,7 @@ describe("GET /api/acquisition/agents", () => {
     vi.mocked(withTenantContext).mockImplementationOnce(async (_tid: string, fn: any) => fn(tx));
 
     const { GET } = await import("@/app/api/acquisition/agents/route");
-    const res = await GET(new Request("http://test"));
+    const res = await GET();
     expect(res.status).toBe(200);
     const json: any = await res.json();
     expect(json.status).toBe("not_configured");
@@ -101,7 +102,7 @@ describe("GET /api/acquisition/agents", () => {
     vi.mocked(withTenantContext).mockImplementationOnce(async (_tid: string, fn: any) => fn(tx));
 
     const { GET } = await import("@/app/api/acquisition/agents/route");
-    const res = await GET(new Request("http://test"));
+    const res = await GET();
     expect(res.status).toBe(200);
     const json: any = await res.json();
     // never leak credentialRef
@@ -133,7 +134,7 @@ describe("GET /api/acquisition/agents", () => {
     const tx = makeTx({ config, usage: [] });
     vi.mocked(withTenantContext).mockImplementationOnce(async (_tid: string, fn: any) => fn(tx));
     const { GET } = await import("@/app/api/acquisition/agents/route");
-    const res = await GET(new Request("http://test"));
+    const res = await GET();
     const json: any = await res.json();
     expect(json.gateway.status).toBe("disabled");
   });

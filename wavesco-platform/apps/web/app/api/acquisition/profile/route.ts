@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireControlAuth, auditControl } from "@/lib/wavesco/control";
+import { acquisitionDenied, requireControlAuth, auditControl } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 import {
   validateProfileInput,
@@ -45,6 +45,8 @@ function sanitizeProfileForClient(
 export async function GET() {
   try {
     const { tenantId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const result = await withTenantContext(tenantId, async (tx: any) => {
       const profile = await (tx as any).acquisitionProfile.findFirst({
         where: { tenantId },
@@ -72,6 +74,8 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { tenantId, userId } = await requireControlAuth();
+    const denied = await acquisitionDenied(tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     const body = await req.json().catch(() => ({}));
     const input = (body ?? {}) as Record<string, unknown>;
 

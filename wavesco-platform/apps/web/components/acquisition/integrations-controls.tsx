@@ -55,7 +55,7 @@ export function TestConnectionButton({ integrationKey, label }: { integrationKey
         type="button"
         disabled={pending}
         onClick={onTest}
-        className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+        className="rounded-lg border border-border/80 px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
       >
         {pending ? "Testing…" : "Test Connection"}
       </button>

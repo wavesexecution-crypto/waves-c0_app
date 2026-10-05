@@ -34,6 +34,12 @@ model Tenant {
   refreshTokens           RefreshToken[]
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  acquisitionEntitlement  AcquisitionEntitlement?
+  acquisitionOrders       AcquisitionOrder[]
+  conversations           Conversation[]
+  conversationMessages    ConversationMessage[]
+  leadConversions         LeadConversion[]
+  storedObjects           StoredObject[]
 }
 
 model User {
@@ -621,4 +627,167 @@ model NotificationPreference {
   @@unique([tenantId, category, channel])
   @@index([tenantId])
   @@map("NotificationPreference")
+}
+
+// --- Acquisition OS entitlement (authoritative access record) --------------
+// ONE row per tenant. Status lifecycle:
+//   TRIAL → ACTIVE | EXPIRED
+//   ACTIVE → EXPIRED | SUSPENDED | CANCELLED | REFUNDED
+//   EXPIRED → ACTIVE (renewal) | CANCELLED
+//   SUSPENDED → ACTIVE | CANCELLED
+//   CANCELLED / REFUNDED are terminal.
+// Provider-agnostic: `source` records how access was granted (TRIAL, MANUAL,
+// IMPORT) without coupling to any payment provider. Amounts are optional and
+// informational only — pricing lives outside this table.
+model AcquisitionEntitlement {
+  id             String    @id @default(cuid())
+  tenantId       String    @unique
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  status         String    @default("TRIAL")
+  source         String    @default("TRIAL")
+  trialStartedAt DateTime?
+  trialExpiresAt DateTime?
+  startedAt      DateTime?
+  expiresAt      DateTime?
+  suspendedAt    DateTime?
+  cancelReason   String?
+  orderId        String?
+  metadata       Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  orders AcquisitionOrder[]
+
+  @@index([tenantId, status])
+  @@index([expiresAt])
+  @@index([status])
+  @@map("AcquisitionEntitlement")
+}
+
+// Provider-agnostic payment/access-grant ledger. One row per grant attempt.
+// `provider` is free text (e.g. "manual", "trial", future providers) —
+// never a hard dependency. `providerRef` links the external proof when one
+// exists. Access itself is derived from AcquisitionEntitlement, never from
+// this table directly.
+model AcquisitionOrder {
+  id             String    @id @default(cuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entitlementId  String?
+  entitlement    AcquisitionEntitlement? @relation(fields: [entitlementId], references: [id])
+  amountPaise    Int?
+  currency       String    @default("INR")
+  status         String    @default("PENDING")
+  provider       String    @default("manual")
+  providerRef    String?   @unique
+  idempotencyKey String    @unique
+  meta           Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tenantId, status])
+  @@index([entitlementId])
+  @@index([idempotencyKey])
+  @@map("AcquisitionOrder")
+}
+
+// --- Inbound conversations (replies, bounces, unsubscribes) ----------------
+// ONE thread per (tenant, leadKey). Written by the ingest endpoint and by
+// corpus reply sync. The UI reads this — never the raw corpus — as the
+// source of truth for WHO REPLIED / WHAT THEY SAID / WHAT STATE IT IS IN.
+model Conversation {
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leadKey      String
+  businessName String?
+  email        String?
+  status       String    @default("OPEN")
+  lastMessageAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  messages ConversationMessage[]
+
+  @@unique([tenantId, leadKey])
+  @@index([tenantId, status])
+  @@index([tenantId, email])
+  @@map("Conversation")
+}
+
+model ConversationMessage {
+  id             String    @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  direction      String
+  kind           String    @default("reply")
+  body           String
+  providerMsgId  String?   @unique
+  metadata       Json?
+  createdAt      DateTime  @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([tenantId])
+  @@map("ConversationMessage")
+}
+
+// --- Lead conversion (verified outcomes only) -------------------------------
+// ONE row per (tenant, leadKey), updated in place. States are explicit and
+// operator-verified: MEETING (call booked & confirmed), WON, LOST.
+// CTA clicks are NOT conversions — only rows here count.
+model LeadConversion {
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leadKey         String
+  businessName    String?
+  state           String
+  note            String?
+  orderId         String?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([tenantId, leadKey])
+  @@index([tenantId, state])
+  @@map("LeadConversion")
+}
+
+// --- Stored objects (Waves-held persistent artifacts) -----------------------
+// Registry for every binary artifact the platform persists: client uploads,
+// archived PDF/XLSX reports, and generated artifacts. Bytes live in object
+// storage (local dir for dev, S3-compatible in prod); THIS table is the
+// authoritative index — never serve bytes without a READY row scoped to the
+// requesting tenant.
+//
+// Lifecycle: PENDING (reserved) → READY → DELETED (bytes removed,
+// row retained as tombstone for audit). Expiry of the tenant's entitlement
+// NEVER deletes rows (EXPIRY ≠ DELETION); explicit purge only.
+model StoredObject {
+  id               String    @id @default(cuid())
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kind             String
+  batchId          String?
+  fileName         String
+  mime             String
+  sizeBytes        Int
+  sha256           String
+  provider         String
+  bucket           String?
+  objectKey        String
+  status           String    @default("READY")
+  createdByUserId  String?
+  meta             Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  @@index([tenantId, status])
+  @@index([tenantId, kind])
+  @@index([tenantId, batchId])
+  @@index([objectKey])
+  @@map("StoredObject")
 }

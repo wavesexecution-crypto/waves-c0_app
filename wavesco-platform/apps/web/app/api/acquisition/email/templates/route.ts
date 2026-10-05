@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { auditControl, requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, auditControl, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +44,8 @@ export async function GET(req: Request) {
   let tenantId: string;
   try {
     const auth = await requireControlAuth();
+    const denied = await acquisitionDenied(auth.tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     tenantId = auth.tenantId;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -164,6 +166,8 @@ export async function POST(req: Request) {
   let userId: string | null | undefined;
   try {
     const auth = await requireControlAuth();
+    const denied = await acquisitionDenied(auth.tenantId);
+    if (denied) return NextResponse.json(denied.body, { status: denied.status });
     tenantId = auth.tenantId;
     userId = auth.userId;
   } catch (e) {
@@ -447,8 +451,11 @@ export async function POST(req: Request) {
               // ignore
             }
           }
-          // ultimate fallback: in-memory
-          return { id: `tmpl_${randomUUID().replace(/-/g, "").slice(0, 12)}`, tenantId, subject, body: bodyStr, createdAt: new Date().toISOString() };
+          // No emailTemplate table and no activityEvent fallback: refuse.
+          // Returning a fabricated in-memory object with HTTP 200 made the UI
+          // print "Template created — audit-logged" for something that was
+          // never stored and vanished on refresh.
+          throw new Error("TEMPLATE_STORAGE_UNAVAILABLE");
         } else {
           // update
           const id = templateId;
@@ -459,8 +466,9 @@ export async function POST(req: Request) {
           let existing: any = null;
           if (tx.emailTemplate && typeof tx.emailTemplate.findFirst === "function") {
             try {
+              // Tenant-scoped only. The previous `findUnique({ id })` fallback
+              // matched another workspace's template on a guessed id.
               existing = await tx.emailTemplate.findFirst({ where: { id, tenantId } });
-              if (!existing) existing = await tx.emailTemplate.findUnique?.({ where: { id } }).catch(() => null);
             } catch {
               // ignore
             }
@@ -475,21 +483,38 @@ export async function POST(req: Request) {
           }
           before = existing;
 
+          if (!existing) {
+            // Never write to a row this tenant cannot see.
+            throw new Error("TEMPLATE_NOT_FOUND");
+          }
+
           if (tx.emailTemplate && typeof tx.emailTemplate.update === "function") {
             try {
-              const updated = await tx.emailTemplate.update({ where: { id }, data: { subject, body: bodyStr } });
-              return updated;
-            } catch {
-              // fallback to activityEvent update if available
-              if (tx.activityEvent && typeof tx.activityEvent.update === "function" && existing) {
-                const ev = await tx.activityEvent.update({ where: { id }, data: { title: subject, metadata: { body: bodyStr, subject } } });
+              // Tenant-scoped update — `update({ where: { id } })` mutated
+              // whichever tenant owned that id.
+              const updated = await tx.emailTemplate.updateMany({
+                where: { id, tenantId },
+                data: { subject, body: bodyStr },
+              });
+              if (updated.count > 0) {
+                return { id, tenantId, subject, body: bodyStr, updatedAt: new Date().toISOString() };
+              }
+              throw new Error("TEMPLATE_NOT_FOUND");
+            } catch (e) {
+              if (e instanceof Error && e.message === "TEMPLATE_NOT_FOUND") throw e;
+              // fall through to activityEvent update if available
+              if (tx.activityEvent && typeof tx.activityEvent.update === "function") {
+                const ev = await tx.activityEvent.update({
+                  where: { id },
+                  data: { title: subject, metadata: { body: bodyStr, subject } },
+                });
                 return { id: ev.id, subject, body: bodyStr, updatedAt: ev.createdAt };
               }
-              // fallback to simulated update
-              return { id, subject, body: bodyStr, updatedAt: new Date().toISOString(), previous: existing };
+              // Refuse rather than report a simulated success.
+              throw new Error("TEMPLATE_STORAGE_UNAVAILABLE");
             }
           }
-          if (tx.activityEvent && typeof tx.activityEvent.update === "function" && existing) {
+          if (tx.activityEvent && typeof tx.activityEvent.update === "function") {
             try {
               const ev = await tx.activityEvent.update({ where: { id }, data: { title: subject, metadata: { body: bodyStr, subject } } });
               return { id: ev.id, subject, body: bodyStr, updatedAt: new Date().toISOString() };
@@ -497,8 +522,7 @@ export async function POST(req: Request) {
               // ignore
             }
           }
-          // simulate update
-          return { id, subject, body: bodyStr, updatedAt: new Date().toISOString(), previous: existing };
+          throw new Error("TEMPLATE_STORAGE_UNAVAILABLE");
         }
       });
       createdOrUpdated = result;
@@ -507,7 +531,21 @@ export async function POST(req: Request) {
       if (msg.includes("templateId required")) {
         return NextResponse.json({ error: "templateId required for update" }, { status: 400 });
       }
-      return NextResponse.json({ error: "internal", detail: msg.slice(0, 300) }, { status: 500 });
+      if (msg.includes("TEMPLATE_NOT_FOUND")) {
+        return NextResponse.json({ error: "That template does not exist." }, { status: 404 });
+      }
+      if (msg.includes("TEMPLATE_STORAGE_UNAVAILABLE")) {
+        console.error("[email:templates] template storage unavailable", e);
+        return NextResponse.json(
+          { error: "Templates cannot be saved right now. Contact Waves — your email has not been changed." },
+          { status: 501 }
+        );
+      }
+      console.error("[email:templates] write failed", e);
+      return NextResponse.json(
+        { error: "We could not save that template. Try again in a moment." },
+        { status: 500 }
+      );
     }
 
     // Audit create/update

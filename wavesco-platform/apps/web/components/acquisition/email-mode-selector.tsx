@@ -96,10 +96,10 @@ export function EmailModeSelector({ initialMode }: { initialMode: EmailMode }) {
   }
 
   return (
-    <section className="rounded-lg border bg-card p-4">
+    <section className="rounded-lg border border-border/80 bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">How should Acquisition OS handle email?</h2>
+          <h2 className="font-sans text-[13px] font-semibold">How should Acquisition OS handle email?</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Your choice decides how campaign emails are sent. Either way, sending only
             happens after you approve a campaign.
@@ -109,7 +109,7 @@ export function EmailModeSelector({ initialMode }: { initialMode: EmailMode }) {
           <StatusPill
             state={current.status === "active" ? "connected" : "pending"}
           />
-          <span className="text-xs font-medium">{current.label}</span>
+          <span className="font-sans text-[13px] font-medium tracking-[-0.01em]">{current.label}</span>
         </div>
       </div>
 
@@ -123,14 +123,14 @@ export function EmailModeSelector({ initialMode }: { initialMode: EmailMode }) {
               onClick={() => void choose(c.mode)}
               disabled={saving !== null}
               aria-pressed={selected}
-              className={`rounded-md border p-3 text-left transition-colors disabled:opacity-60 ${
+              className={`rounded-lg border border-border/80 p-3 text-left transition-colors disabled:opacity-60 ${
                 selected
                   ? "border-primary bg-primary/5"
                   : "border-border hover:bg-accent/40"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">{c.title}</span>
+                <span className="font-sans text-[13px] font-medium">{c.title}</span>
                 {selected ? (
                   <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                     Selected
@@ -149,7 +149,7 @@ export function EmailModeSelector({ initialMode }: { initialMode: EmailMode }) {
       <p className="mt-3 text-xs text-muted-foreground">{current.description}</p>
 
       {error ? (
-        <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/5 p-2">
+        <div className="mt-2 rounded-lg border border-red-500/30 bg-red-500/5 p-2">
           <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
           <button
             type="button"

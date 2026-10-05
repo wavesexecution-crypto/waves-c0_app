@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { auth } from "@/lib/auth";
-import { prisma, withTenantContext } from "@wavesco/db";
+import { directPrisma, withTenantContext } from "@wavesco/db";
 import { runAcquisitionReconciliation } from "@/lib/wavesco/reconcile";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,9 @@ async function handle(req: Request): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Invalid key." }, { status: 401 });
     }
 
-    const tenants = await prisma.tenant.findMany({ select: { id: true } });
+    // Owner-role read: the runtime role has no tenant context on this path,
+    // so an RLS-bound query would silently reconcile zero tenants.
+    const tenants = await directPrisma().tenant.findMany({ select: { id: true } });
     const results: Array<Record<string, unknown>> = [];
     const errors: string[] = [];
     for (const t of tenants) {
