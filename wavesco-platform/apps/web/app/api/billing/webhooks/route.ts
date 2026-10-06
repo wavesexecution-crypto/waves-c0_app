@@ -104,6 +104,21 @@ async function handleCaptured(payment: Record<string, unknown>) {
     return NextResponse.json({ ok: true, note: "order has no lease mapping — flagged for review" }, { status: 200 });
   }
 
+  // INTEGRATION GATE: the webhook must replicate the amount check the client
+  // verify route performs. Before this, a captured payment for a different
+  // amount than the order's locked price still granted the full lease — a
+  // partial capture or an under-captured payment must never activate access.
+  const capturedAmount =
+    typeof payment.amount === "number" ? payment.amount : typeof payment.amount_captured === "number" ? payment.amount_captured : null;
+  if (order.amountPaise != null && capturedAmount != null && capturedAmount !== order.amountPaise) {
+    console.error("[billing:webhook] amount_mismatch — no grant", { orderId, tenantId: order.tenantId, capturedAmount, expected: order.amountPaise });
+    return NextResponse.json({ error: "amount_mismatch" }, { status: 400 });
+  }
+  const capturedCurrency = typeof payment.currency === "string" ? payment.currency : null;
+  if (order.currency && capturedCurrency && capturedCurrency !== order.currency) {
+    return NextResponse.json({ error: "currency_mismatch" }, { status: 400 });
+  }
+
   await activatePaid(
     order.tenantId,
     {

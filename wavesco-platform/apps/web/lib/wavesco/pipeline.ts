@@ -216,9 +216,16 @@ function getEngineLead(nameKey: string): EngineLead | undefined {
 // Stage 3 — EMAIL CHECK (validate + global dedupe; nothing is sent)
 // ------------------------------------------------------------------
 
-async function collectLiveOrderEmails(db: Tx, excludeLeadKey: string | null): Promise<Set<string>> {
+async function collectLiveOrderEmails(db: Tx, excludeLeadKey: string | null, tenantId?: string): Promise<Set<string>> {
+  // Scope to the caller's tenant. The previous unbounded `where` returned every
+  // tenant's live-order addresses, so an address was "already live" only
+  // because of *another* tenant's order — leaking contact existence across
+  // workspaces and silently suppressing one tenant's outreach because a
+  // different tenant touched the same address.
   const rows = await db.outreachOrder.findMany({
-    where: { status: { in: [...LIVE_ORDER_STATUSES] } },
+    where: tenantId
+      ? { status: { in: [...LIVE_ORDER_STATUSES] }, tenantId }
+      : { status: { in: [...LIVE_ORDER_STATUSES] } },
     select: { email: true, leadKey: true },
   });
   return new Set(rows.filter((r) => r.leadKey !== excludeLeadKey).map((r) => r.email.toLowerCase()));
@@ -230,7 +237,7 @@ export async function checkLeadEmail(tenantId: string, nameKey: string): Promise
   if (!lead) return { ok: false, status: "NOT_FOUND", email: null, reason: "lead not found" };
 
   const result = await withTenantContext(tenantId, async (tx) => {
-    const live = await collectLiveOrderEmails(tx, nameKey);
+    const live = await collectLiveOrderEmails(tx, nameKey, tenantId);
     const check = classifyEmail(lead, live);
 
     // Persist the check on the research row when present.
@@ -357,7 +364,7 @@ export async function createOutreachOrder(
     });
     if (!research) return { ok: false as const, error: "Run lead research first." };
 
-    const live = await collectLiveOrderEmails(tx, nameKey);
+    const live = await collectLiveOrderEmails(tx, nameKey, tenantId);
     const check = classifyEmail(lead, live);
     if (check.status !== "VERIFIED" || !check.email) {
       return { ok: false as const, error: `Email not eligible: ${check.status} (${check.reason}).` };

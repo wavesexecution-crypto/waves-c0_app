@@ -461,6 +461,7 @@ export async function activatePaid(
         const ent = await tx.acquisitionEntitlement.findUnique({ where: { tenantId } });
         if (ent) return ent;
       }
+      let wonOrderTransition = false;
       if (!prior) {
         await tx.acquisitionOrder.create({
           data: {
@@ -472,10 +473,27 @@ export async function activatePaid(
             meta: { note: grant.note?.slice(0, 500) ?? null },
           },
         });
+        wonOrderTransition = true;
       } else if (prior.status !== "VERIFIED") {
-        await tx.acquisitionOrder.update({ where: { id: prior.id }, data: { status: "VERIFIED" } });
+        // Atomic guard: only the request whose UPDATE actually flips the row to
+        // VERIFIED may extend the lease. A concurrent duplicate driven through
+        // the same idempotency key matches 0 rows and must return the grant
+        // produced by the winner — never stack an extra lease on it.
+        const res = await tx.acquisitionOrder.updateMany({
+          where: { id: prior.id, status: { not: "VERIFIED" } },
+          data: { status: "VERIFIED" },
+        });
+        wonOrderTransition = res.count === 1;
       }
       const order = await tx.acquisitionOrder.findUnique({ where: { idempotencyKey } });
+
+      // A concurrent duplicate already turned this order VERIFIED: it produced
+      // the current grant, so return that grant unchanged rather than
+      // stacking a second lease on top of it.
+      if (prior && !wonOrderTransition) {
+        const existing = await tx.acquisitionEntitlement.findUnique({ where: { tenantId } });
+        if (existing) return existing;
+      }
 
       // EXTENSION MUST PRESERVE REMAINING PAID TIME.
       // The expiry used to be computed from `now`, so a customer 80 days into a

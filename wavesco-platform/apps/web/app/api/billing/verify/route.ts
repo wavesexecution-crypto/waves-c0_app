@@ -51,9 +51,12 @@ export async function POST(req: Request) {
   }
 
   // 2) Order must exist for THIS tenant. RLS hides other tenants' rows, so a
-  //    cross-tenant attempt yields the same 404 as an unknown order.
+  //    cross-tenant attempt yields the same 404 as an unknown order. The
+  //    tenant predicate is explicit too: with a table-owner connection (where
+  //    ENABLE RLS does not apply) a predicate-less lookup would return another
+  //    tenant's order.
   const order = await withTenantContext(auth.tenantId, async (tx) =>
-    tx.acquisitionOrder.findFirst({ where: { providerRef: razorpayOrderId } }),
+    tx.acquisitionOrder.findFirst({ where: { providerRef: razorpayOrderId, tenantId: auth.tenantId } }),
   );
   if (!order) {
     return NextResponse.json({ error: "order_not_found" }, { status: 404 });

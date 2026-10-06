@@ -12,7 +12,17 @@ export const runtime = "nodejs";
  */
 export async function POST(request: Request) {
   const session = await auth();
-  const user = requireSession(session);
+  const user = requireSession(session) as { tenantId?: string; role?: string };
+  // Importing a blob overwrites this tenant's user roles. Without an
+  // owner/admin gate, any member could export their own tenant's blob, edit
+  // the roles array, and re-import to mint themselves `owner`.
+  const role = typeof user?.role === "string" ? user.role : "member";
+  if (role !== "owner" && role !== "admin") {
+    return NextResponse.json({ error: "Owner or admin role required." }, { status: 403 });
+  }
+  if (!user?.tenantId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   let body: unknown;
   try {

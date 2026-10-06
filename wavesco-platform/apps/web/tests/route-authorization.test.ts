@@ -62,14 +62,15 @@ vi.mock("@/lib/wavesco/lead-engine", () => ({
           batchId,
           leadCount: 10,
           emailReadyCount: 4,
-          // Inside the batch's own run directory.
-          pdfPath: "C:/leads/data/runs/engine-batch-a/report.pdf",
-          excelPath: "C:/leads/data/runs/engine-batch-a/report.xlsx",
+          // Real engine paths: PDF in reports/, XLSX in exports/
+          pdfPath: "C:/leads/reports/engine-batch-a/report.pdf",
+          excelPath: "C:/leads/exports/engine-batch-a/report.xlsx",
         }
       : undefined,
   ),
   fetchManifestFile: vi.fn(async () => ({ ok: false as const })),
   leadEngineMode: vi.fn(() => "local"),
+  leadEngineRoot: vi.fn(() => "C:/leads"),
   runsDir: vi.fn(() => "C:/leads/data/runs"),
   // Used by computeEligibilityAction — it expects a bare array.
   selectCampaignCandidates: vi.fn(async () => []),
@@ -153,17 +154,18 @@ describe("resendReportAction — batch ownership (IDOR)", () => {
     expect(out.error ?? "").not.toMatch(/no such batch/i);
   });
 
-  it("rejects a manifest path that escapes the batch directory", async () => {
+  it("refuses a manifest path that escapes the engine output directories", async () => {
     mem.generationBatch.push({ id: "gb-1", tenantId: "t1", engineBatchId: "evil" });
     const { getBatchManifest } = await import("@/lib/wavesco/lead-engine");
     vi.mocked(getBatchManifest).mockResolvedValueOnce({
       batchId: "evil",
-      pdfPath: "C:/leads/data/runs/engine-batch-a/secret.pdf",
+      // Traversal attempt - escapes the engine root entirely
+      pdfPath: "C:/leads/../../../../etc/passwd",
     } as any);
     const { resendReportAction } = await import("@/lib/actions/reports");
     const out = await resendReportAction({ ok: true }, fd({ batchId: "evil" }));
     expect(out.ok).toBe(false);
-    expect(out.error).toMatch(/outside its batch directory/i);
+    expect(out.error).toMatch(/outside the engine output/i);
   });
 
   it("rejects a traversal path in the manifest", async () => {
@@ -278,3 +280,4 @@ describe("documents/generate — no unscoped fallback lookup", () => {
     expect(JSON.stringify(body)).not.toContain("passwd");
   });
 });
+

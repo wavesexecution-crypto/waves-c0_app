@@ -9,7 +9,22 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const session = await auth();
-  const user = requireSession(session);
+  const user = requireSession(session) as { tenantId: string; id: string; role?: string };
+
+  // Enabling a module must never become an access path: the legacy enabled
+  // flag is what the fail-open readLegacy fallback reads to grant access.
+  // Require owner/admin AND a live entitlement.
+  const role = typeof user?.role === "string" ? user.role : "member";
+  if (role !== "owner" && role !== "admin") {
+    return NextResponse.json({ error: "Owner or admin role required." }, { status: 403 });
+  }
+  // Only allow enabling a module when the tenant already has real access —
+  // a tenant with no grant cannot mint access from this endpoint.
+  const { acquisitionDenied } = await import("@/lib/wavesco/control");
+  const denied = await acquisitionDenied(user.tenantId);
+  if (denied) {
+    return NextResponse.json(denied.body, { status: denied.status });
+  }
 
   let body: unknown;
   try {
