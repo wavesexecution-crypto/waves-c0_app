@@ -76,6 +76,17 @@ function makeTx() {
         Object.assign(existing, update);
         return existing;
       },
+      updateMany: async ({ where, data }: any) => {
+        let count = 0;
+        for (const r of mem.tenantModule) {
+          if ((!where.tenantId || r.tenantId === where.tenantId) &&
+              (!where.moduleId || r.moduleId === where.moduleId)) {
+            Object.assign(r, data);
+            count++;
+          }
+        }
+        return { count };
+      },
     },
     acquisitionProfile: {
       findUnique: async ({ where }: any) => mem.acquisitionProfile.find((r) => r.tenantId === where.tenantId) ?? null,
@@ -210,9 +221,20 @@ describe("trial grants", () => {
     mem.acquisitionEntitlement[0]!.status = "EXPIRED";
     await expect(startTrial("t1", "u1")).rejects.toMatchObject({ status: 409 });
   });
-  it("invalid trial lengths rejected", async () => {
-    await expect(startTrial("t1", "u1", 0)).rejects.toThrow(/between 1 and 60/);
-    await expect(startTrial("t1", "u1", 61)).rejects.toThrow(/between 1 and 60/);
+  it("the proof period is locked to 2 days — no caller may lengthen it", async () => {
+    // The commercial model is a fixed 2-day proof. This used to accept any
+    // length in 1..60, which silently granted 14 days by default.
+    await expect(startTrial("t1", "u1", 0)).rejects.toThrow(/fixed at 2 days/);
+    await expect(startTrial("t1", "u1", 14)).rejects.toThrow(/fixed at 2 days/);
+    await expect(startTrial("t1", "u1", 60)).rejects.toThrow(/fixed at 2 days/);
+  });
+
+  it("a default trial lasts 2 days, not 14", async () => {
+    const { entitlement } = await startTrial("t1", "u1");
+    const days = Math.round(
+      (new Date(entitlement.trialExpiresAt as string).getTime() - Date.now()) / 86_400_000,
+    );
+    expect(days).toBe(2);
   });
 });
 
@@ -232,6 +254,33 @@ describe("paid activation (provider-agnostic)", () => {
     const r2 = await activatePaid("t1", g, "u1");
     expect(mem.acquisitionOrder).toHaveLength(1);
     expect(r2.entitlement.status).toBe("active");
+  });
+
+  it("a second paid grant EXTENDS from the remaining paid time, never truncates it", async () => {
+    // Regression: the expiry was computed from `now`, so a customer 80 days
+    // into a 365-day lease who bought 90 days silently lost those 80 paid days.
+    await activatePaid("t1", { days: 365 }, "u1");
+    const remaining = 80 * 86_400_000;
+    mem.acquisitionEntitlement[0]!.expiresAt = new Date(Date.now() + remaining);
+    const startedBefore = new Date(mem.acquisitionEntitlement[0]!.startedAt);
+
+    await activatePaid("t1", { days: 90, idempotencyKey: "k2" }, "u1");
+    const after = new Date(mem.acquisitionEntitlement[0]!.expiresAt).getTime();
+    const expected = Date.now() + remaining + 90 * 86_400_000;
+    // 90 days were added to the 80 remaining — nothing was thrown away.
+    expect(Math.abs(after - expected)).toBeLessThan(5_000);
+    // And the original start of paid tenure is preserved.
+    expect(new Date(mem.acquisitionEntitlement[0]!.startedAt).getTime()).toBe(
+      startedBefore.getTime(),
+    );
+  });
+
+  it("a paid grant consumes the single-use trial marker", async () => {
+    await startTrial("t1", "u1");
+    await activatePaid("t1", { days: 30 }, "u1");
+    // The trial must not become available again after paying.
+    expect(mem.acquisitionEntitlement[0]!.trialStartedAt).not.toBeNull();
+    await expect(startTrial("t1", "u1")).rejects.toThrow(/already/i);
   });
 });
 
@@ -264,6 +313,24 @@ describe("lifecycle transitions", () => {
     await active();
     mem.acquisitionEntitlement[0]!.status = "EXPIRED";
     await expect(transitionEntitlement("t1", "suspend", {}, "u1")).rejects.toThrow(/Cannot suspend/i);
+  });
+
+  it("refund clears the legacy TenantModule flag", async () => {
+    // Regression: refunds only changed the entitlement row. The pre-migration
+    // `TenantModule` flag stayed `enabled`, so the legacy fallback reported
+    // `active` for a refunded tenant whenever the authoritative read errored.
+    await active();
+    expect(mem.tenantModule[0]!.status).toBe("enabled");
+    await transitionEntitlement("t1", "refund", { reason: "refund requested" }, "u1");
+    expect(mem.acquisitionEntitlement[0]!.status).toBe("REFUNDED");
+    expect(mem.tenantModule[0]!.status).toBe("disabled");
+  });
+
+  it("suspend clears the legacy TenantModule flag too", async () => {
+    await active();
+    await transitionEntitlement("t1", "suspend", { reason: "non-payment" }, "u1");
+    expect(mem.acquisitionEntitlement[0]!.status).toBe("SUSPENDED");
+    expect(mem.tenantModule[0]!.status).toBe("disabled");
   });
 });
 

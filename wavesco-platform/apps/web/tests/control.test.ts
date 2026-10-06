@@ -4,6 +4,12 @@ vi.mock("@/lib/auth", () => ({ auth: vi.fn(async () => ({ user: { id: "u1", emai
 vi.mock("@/lib/tenant", () => ({ requireTenantId: vi.fn(() => "t1") }));
 vi.mock("@wavesco/db", () => ({
   prisma: { auditLog: { create: vi.fn(async (x: { data: Record<string, unknown> }) => ({ id: "a1", ...x.data })) } },
+  // No tenant transaction is open in this unit test, so auditControl falls
+  // back to its own withTenantContext — which is what makes the mocked
+  // `prisma.auditLog.create` the writer.
+  getTenantTx: vi.fn(() => undefined),
+  // requireControlAuth calls this once per process; it is a no-op in tests.
+  assertRuntimeRoleIsNotTableOwner: vi.fn(async () => undefined),
   withTenantContext: vi.fn(async (_tid: string, fn: (tx: unknown) => Promise<unknown>) =>
     fn({
       acquisitionEntitlement: {
@@ -13,6 +19,9 @@ vi.mock("@wavesco/db", () => ({
           startedAt: new Date(), expiresAt: new Date(Date.now() + 86_400_000),
         }),
         update: async ({ data }: any) => ({ id: "ent1", status: "ACTIVE", ...data }),
+      },
+      auditLog: {
+        create: async (x: { data: Record<string, unknown> }) => ({ id: "a1", ...x.data }),
       },
     }),
   ),

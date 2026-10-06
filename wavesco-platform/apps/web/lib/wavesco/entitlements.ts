@@ -47,8 +47,9 @@ export interface Entitlement {
   readFailed?: boolean;
 }
 
-/** Trial length for self-serve trials. Operator policy, not pricing. */
-export const TRIAL_DAYS_DEFAULT = 14;
+/** Trial length: the locked 2-Day Proof. This is not a policy knob — the
+ *  commercial model is fixed at two days. Previously 14. */
+export const TRIAL_DAYS_DEFAULT = 2;
 
 /** Access is granted while trialing or active. Everything else is blocked. */
 export function hasAccess(status: EntitlementStatus): boolean {
@@ -136,13 +137,47 @@ async function applyLazyExpiry(tenantId: string): Promise<any | null> {
     if (!e) return null;
     const now = new Date();
     if (e.status === "TRIAL" && e.trialExpiresAt && new Date(e.trialExpiresAt) < now) {
-      return tx.acquisitionEntitlement.update({ where: { tenantId }, data: { status: "EXPIRED" } });
+      return revoke(tx, tenantId, e, "EXPIRED");
     }
     if (e.status === "ACTIVE" && e.expiresAt && new Date(e.expiresAt) < now) {
-      return tx.acquisitionEntitlement.update({ where: { tenantId }, data: { status: "EXPIRED" } });
+      return revoke(tx, tenantId, e, "EXPIRED");
     }
     return e;
   });
+}
+
+/** Disable the legacy `TenantModule` flag so the pre-migration fallback stops
+ *  disagreeing with the authoritative entitlement row. */
+async function disableLegacyModuleFlag(tx: any, tenantId: string): Promise<void> {
+  try {
+    const mod = await tx.module.findUnique({ where: { name: "acquisition-os" }, select: { id: true } });
+    if (mod) {
+      await tx.tenantModule.updateMany({
+        where: { tenantId, moduleId: mod.id },
+        data: { status: "disabled", disabledAt: new Date() },
+      });
+    }
+  } catch (err) {
+    console.warn("[entitlements] could not clear legacy TenantModule flag", err);
+  }
+}
+
+/**
+ * Move a grant out of ACTIVE/TRIAL and disable the legacy TenantModule flag.
+ *
+ * The flag is never cleared anywhere else, so while it stayed `enabled` the
+ * pre-migration fallback (`readLegacy`) kept reporting `active` for a tenant
+ * whose paid lease had lapsed — a revoked tenant kept full access whenever the
+ * authoritative read errored. Clearing it makes the fallback agree with the
+ * authoritative row.
+ */
+async function revoke(tx: any, tenantId: string, e: any, next: string) {
+  const updated = await tx.acquisitionEntitlement.update({
+    where: { tenantId },
+    data: { status: next },
+  });
+  await disableLegacyModuleFlag(tx, tenantId);
+  return updated;
 }
 
 export async function getAcquisitionOSEntitlement(tenantId: string): Promise<Entitlement> {
@@ -155,12 +190,15 @@ export async function getAcquisitionOSEntitlement(tenantId: string): Promise<Ent
     // reported as readFailed below rather than as "not rented".
     console.warn("[entitlements] authoritative read failed, trying legacy read", e);
   }
+
+  // No row on the authoritative table. Only now may the pre-migration
+  // TenantModule fallback speak — and only when the table read actually
+  // succeeded. If it also fails we MUST NOT resolve to "active": a DB error
+  // that produced an access grant would silently resurrect an expired,
+  // cancelled or refunded tenant.
   try {
     return await readLegacy(tenantId);
   } catch (e) {
-    // Both reads failed. This is an outage, not a billing state — the client
-    // must never be told their access was never purchased, and must never see
-    // the driver's message.
     console.error("[entitlements] entitlement lookup failed", e);
     return {
       product: "acquisition-os",
@@ -316,38 +354,55 @@ export async function startTrial(
   userId?: string | null,
   days: number = TRIAL_DAYS_DEFAULT,
 ): Promise<GrantResult> {
-  if (!Number.isFinite(days) || days < 1 || days > 60) {
-    throw new Error("Trial length must be between 1 and 60 days.");
+  // The 2-day proof is the locked commercial model. Do not accept a longer
+  // term from any caller: this was silently 14 days.
+  if (!Number.isFinite(days) || days !== TRIAL_DAYS_DEFAULT) {
+    throw new Error(`The proof period is fixed at ${TRIAL_DAYS_DEFAULT} days.`);
   }
-  const existing = await getAcquisitionOSEntitlement(tenantId);
-  if (existing.entitlementId && ["trial", "active"].includes(existing.status)) {
+  const now = new Date();
+  const expires = new Date(now.getTime() + days * 86_400_000);
+
+  // SINGLE-USE TRIAL — enforced against the ROW, not against a derived read.
+  // The previous guards required `existing.entitlementId`, which is absent on
+  // the legacy fallback path, so any transient read error skipped them and the
+  // upsert below reset a paid tenant back to TRIAL.
+  const prior = await withTenantContext(tenantId, async (tx) =>
+    tx.acquisitionEntitlement.findUnique({ where: { tenantId } }),
+  );
+  if (prior && (prior.status === "TRIAL" || prior.status === "ACTIVE")) {
     const err: any = new Error("Trial already active — complete onboarding to use it.");
     err.status = 409;
     throw err;
   }
-  if (existing.entitlementId && existing.status !== "not_configured") {
-    // A prior EXPIRED/CANCELLED/etc row exists: single-use trial, no reset.
-    const prior = await withTenantContext(tenantId, async (tx) =>
-      tx.acquisitionEntitlement.findUnique({ where: { tenantId } }),
-    );
-    if (prior?.trialStartedAt) {
-      const err: any = new Error("Trial already used — renew to resume access.");
-      err.status = 409;
-      throw err;
-    }
+  if (prior?.trialStartedAt) {
+    const err: any = new Error("Trial already used — renew to resume access.");
+    err.status = 409;
+    throw err;
   }
-  const now = new Date();
-  const expires = new Date(now.getTime() + days * 86_400_000);
+
   const created = await withTenantContext(
     tenantId,
     async (tx) => {
+      // Re-check inside the write transaction so two concurrent clicks cannot
+      // both pass the guard above.
+      const inside = await tx.acquisitionEntitlement.findUnique({ where: { tenantId } });
+      if (inside?.trialStartedAt) {
+        const err: any = new Error("Trial already used — renew to resume access.");
+        err.status = 409;
+        throw err;
+      }
       const row = await tx.acquisitionEntitlement.upsert({
         where: { tenantId },
         create: {
           tenantId, status: "TRIAL", source: "TRIAL",
           trialStartedAt: now, trialExpiresAt: expires,
         },
-        update: { status: "TRIAL", source: "TRIAL", trialStartedAt: now, trialExpiresAt: expires },
+        // Never clobber a paid lease's expiry when the trial is granted.
+        update: {
+          status: "TRIAL", source: "TRIAL",
+          trialStartedAt: now, trialExpiresAt: expires,
+          expiresAt: null,
+        },
       });
       await tx.auditLog.create({
         data: { tenantId, userId: userId ?? null, action: "acquisition.trial.start", model: "AcquisitionEntitlement", recordId: row.id, after: { days, trialExpiresAt: expires } },
@@ -380,22 +435,24 @@ export async function activatePaid(
   userId?: string | null,
 ): Promise<GrantResult> {
   const provider = (grant.provider ?? "manual").trim().slice(0, 60) || "manual";
-  let expiresAt: Date | null = null;
+  let requestedDays = 0;
   if (grant.expiresAt) {
-    expiresAt = new Date(grant.expiresAt);
+    // accepted; base is applied below
   } else if (grant.days !== undefined) {
     if (!Number.isFinite(grant.days) || grant.days < 1 || grant.days > 732) {
       throw new Error("Grant days must be between 1 and 732.");
     }
-    expiresAt = new Date(Date.now() + grant.days * 86_400_000);
+    requestedDays = grant.days;
   }
-  if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+  if (!grant.expiresAt && requestedDays === 0) {
     throw new Error("A future expiry (expiresAt or days) is required to activate paid access.");
   }
+
   const idempotencyKey =
     grant.idempotencyKey?.trim().slice(0, 120) ||
-    `grant:${tenantId}:${provider}:${expiresAt.toISOString()}`;
+    `grant:${tenantId}:${provider}:${grant.expiresAt ? String(grant.expiresAt) : `d${requestedDays}`}`;
   const now = new Date();
+
   const row = await withTenantContext(
     tenantId,
     async (tx) => {
@@ -419,13 +476,41 @@ export async function activatePaid(
         await tx.acquisitionOrder.update({ where: { id: prior.id }, data: { status: "VERIFIED" } });
       }
       const order = await tx.acquisitionOrder.findUnique({ where: { idempotencyKey } });
+
+      // EXTENSION MUST PRESERVE REMAINING PAID TIME.
+      // The expiry used to be computed from `now`, so a customer 80 days into a
+      // 365-day lease who bought a 90-day lease silently lost those 80 paid
+      // days. Base the new term on the current expiry when it is still in the
+      // future — the same rule the `renew` transition already used.
+      const current = await tx.acquisitionEntitlement.findUnique({ where: { tenantId } });
+      const currentExpiry = current?.expiresAt ? new Date(current.expiresAt) : null;
+      const base =
+        currentExpiry && currentExpiry.getTime() > now.getTime() ? currentExpiry : now;
+      const expiresAt =
+        grant.expiresAt !== undefined
+          ? new Date(grant.expiresAt)
+          : new Date(base.getTime() + requestedDays * 86_400_000);
+
+      if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+        throw new Error("A future expiry (expiresAt or days) is required to activate paid access.");
+      }
+
       const ent = await tx.acquisitionEntitlement.upsert({
         where: { tenantId },
         create: {
           tenantId, status: "ACTIVE", source: provider.toUpperCase().slice(0, 20),
-          startedAt: now, expiresAt, orderId: order!.id,
+          // Preserve the original start of paid tenure; a renewal is not a new tenure.
+          startedAt: current?.startedAt ?? now,
+          // A paid grant consumes the single-use trial.
+          trialStartedAt: current?.trialStartedAt ?? now,
+          expiresAt, orderId: order!.id,
         },
-        update: { status: "ACTIVE", startedAt: now, expiresAt, orderId: order!.id },
+        update: {
+          status: "ACTIVE",
+          startedAt: current?.startedAt ?? now,
+          trialStartedAt: current?.trialStartedAt ?? now,
+          expiresAt, orderId: order!.id,
+        },
       });
       await tx.auditLog.create({
         data: { tenantId, userId: userId ?? null, action: "acquisition.grant.paid", model: "AcquisitionEntitlement", recordId: ent.id, after: { provider, expiresAt, orderId: order!.id } },
@@ -496,6 +581,14 @@ export async function transitionEntitlement(
         }
       }
       const updated = await tx.acquisitionEntitlement.update({ where: { tenantId }, data });
+      // Clear the pre-migration TenantModule flag whenever access is taken
+      // away. It was only ever cleared on lazy expiry, so a SUSPENDED,
+      // CANCELLED or REFUNDED tenant kept `enabled = true` and the legacy
+      // fallback (`readLegacy`) would still report `active` — handing a
+      // refunded tenant full access whenever the authoritative read errored.
+      if (data.status && data.status !== "ACTIVE" && data.status !== "TRIAL") {
+        await disableLegacyModuleFlag(tx, tenantId);
+      }
       await tx.auditLog.create({
         data: { tenantId, userId: userId ?? null, action: audit, model: "AcquisitionEntitlement", recordId: updated.id, before: { status: e.status }, after: data },
       });

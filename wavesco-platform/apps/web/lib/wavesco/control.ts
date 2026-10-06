@@ -1,8 +1,12 @@
 import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
+import { assertRuntimeRoleIsNotTableOwner, getTenantTx, withTenantContext } from "@wavesco/db";
 import { entitlementDeniedPayload, requireAcquisitionAccess } from "@/lib/wavesco/entitlements";
 
 export async function requireControlAuth() {
+  // Once per process: warn loudly if the runtime role owns tenant tables, which
+  // would silently disable every tenant filter in the codebase.
+  void assertRuntimeRoleIsNotTableOwner();
   const session = await auth();
   const tenantId = requireTenantId(session as unknown);
   const userId =
@@ -49,17 +53,31 @@ export async function auditControl(args: {
   after?: unknown;
   metadata?: unknown;
 }) {
-  const { prisma } = await import("@wavesco/db");
-  return (prisma as unknown as { auditLog: { create: (x: unknown) => Promise<unknown> } }).auditLog.create({
-    data: {
-      tenantId: args.tenantId,
-      userId: args.userId,
-      action: args.action,
-      model: args.model,
-      recordId: args.recordId,
-      before: args.before as never,
-      after: args.after as never,
-      metadata: args.metadata as never,
-    },
-  });
+  const data = {
+    tenantId: args.tenantId,
+    userId: args.userId,
+    action: args.action,
+    model: args.model,
+    recordId: args.recordId,
+    before: args.before as never,
+    after: args.after as never,
+    metadata: args.metadata as never,
+  };
+
+  // Join the caller's tenant transaction when one is open. Writing through the
+  // module-level `prisma` uses a DIFFERENT pooled connection on which
+  // `SET LOCAL app.tenant_id` was never applied, so a tenant-scoped
+  // `auditlog_insert` policy evaluates the GUC as NULL and rejects the row with
+  // `42501 new row violates row-level security policy` — which rolled back the
+  // whole client-context submission. Using `tx` also commits the audit row
+  // atomically with the mutation it describes.
+  const tx = getTenantTx();
+  if (tx) {
+    return (tx.auditLog as unknown as { create: (x: unknown) => Promise<unknown> }).create({ data });
+  }
+
+  // No open transaction: open one for this tenant so the GUC is set either way.
+  return withTenantContext(args.tenantId, async (inner) => {
+    return (inner.auditLog as unknown as { create: (x: unknown) => Promise<unknown> }).create({ data });
+  }, args.userId ?? undefined);
 }

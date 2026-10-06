@@ -1,4 +1,5 @@
 import { withTenantContext } from "@wavesco/db";
+import { resolveProviderBaseUrl } from "./endpoints";
 
 /**
  * Waves AI Gateway — the ONLY path through which WavesCo code may call an
@@ -184,9 +185,23 @@ export async function wavesAi(call: GatewayCall): Promise<GatewayResult> {
     return finish({ ok: false, status: "unconfigured", error: `Credential reference unresolved (${cfg.provider}).` });
   }
 
+  // The endpoint is server-authoritative. The stored base URL is used only if
+  // it matches the provider allowlist, so a tenant-controlled row can never
+  // redirect the platform credential to a host of their choosing.
+  const endpoint = resolveProviderBaseUrl(cfg.provider, cfg.baseUrl);
+  if (!endpoint.ok || !endpoint.url) {
+    return finish({
+      ok: false,
+      status: "unconfigured",
+      provider: cfg.provider,
+      model: cfg.model,
+      error: "No approved AI endpoint is configured for this workspace.",
+    });
+  }
+
   try {
     const out = await adapter({
-      baseUrl: cfg.baseUrl,
+      baseUrl: endpoint.url,
       model: cfg.model,
       apiKey: cfg.apiKey,
       operation: call.operation,

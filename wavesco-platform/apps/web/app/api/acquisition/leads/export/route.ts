@@ -30,6 +30,23 @@ export async function POST(req: Request) {
     const outreach = ["contacted", "uncontacted", "opted_out", "replied"].includes(outreachRaw)
       ? (outreachRaw as "contacted" | "uncontacted" | "opted_out" | "replied")
       : undefined;
+    if (outreach) {
+      // TENANT ISOLATION: `date_contacted` / `opted_out` / `reply_status` live
+      // in the single shared Lead Engine corpus with no tenant column, so
+      // filtering by them selects rows according to ANOTHER tenant's outreach
+      // history — letting a tenant enumerate who everyone else has contacted
+      // (and whose prospects have opted out, which is consent state).
+      // The export never emits those columns anyway, so accepting the filter
+      // only ever produced a misleading file. Refuse it explicitly.
+      return NextResponse.json(
+        {
+          error:
+            "Outreach filters cannot be exported — contact history is not per-workspace data.",
+          whatNext: "Clear the outreach filter and export again.",
+        },
+        { status: 400 },
+      );
+    }
     const limitRaw = typeof body.limit === "number" ? (body.limit as number) : 1000;
     const limit = Math.min(Math.max(Math.trunc(limitRaw) || 1000, 1), 1000);
 

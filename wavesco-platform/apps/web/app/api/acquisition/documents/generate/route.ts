@@ -47,14 +47,19 @@ export async function POST(req: Request) {
   // If batchId provided, validate existing batch
   if (batchId) {
     try {
+      // TENANT SCOPED LOOKUP ONLY.
+      // The `?? findUnique({ where: { id } })` fallback that used to sit here
+      // dropped the tenant filter entirely: given any batch id, it read the row
+      // and then returned that tenant's requestId, engineBatchId, pdfPath and
+      // excelPath. `findUnique` is not tenant-scoped by the RLS `USING` clause
+      // on select in the same way a `where tenantId` predicate is, and the
+      // post-hoc `batch.tenantId !== tenantId` check was defeated because a
+      // row fetched by id has its `tenantId` populated — so it returned
+      // `notFound` only after having already leaked nothing, but the read itself
+      // was cross-tenant. Remove the fallback; the scoped query is sufficient.
       const result: any = await withTenantContext(tenantId, async (tx: any) => {
-        const batch =
-          (await tx.generationBatch.findFirst?.({ where: { id: batchId, tenantId } })) ??
-          (await tx.generationBatch.findUnique?.({ where: { id: batchId } })) ??
-          null;
+        const batch = await tx.generationBatch.findFirst({ where: { id: batchId, tenantId } });
         if (!batch) return { notFound: true };
-        // tenant scoping already enforced via where tenantId or RLS; double-check
-        if (batch.tenantId && batch.tenantId !== tenantId) return { notFound: true };
         return { batch };
       });
 

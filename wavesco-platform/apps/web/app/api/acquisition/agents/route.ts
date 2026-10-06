@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { acquisitionDenied, auditControl, requireControlAuth } from "@/lib/wavesco/control";
 import { withTenantContext } from "@wavesco/db";
+import { checkProviderBaseUrl } from "@/lib/ai/endpoints";
 
 export const dynamic = "force-dynamic";
 
@@ -194,14 +195,17 @@ export async function POST(req: Request) {
         if (baseUrl !== undefined) {
           if (baseUrl === "" || baseUrl === null) data.baseUrl = null;
           else {
-            // validate URL format — if invalid, record error but still persist masked? treat as error status but still log
-            try {
-              // will throw if invalid
-              new URL(baseUrl);
-              data.baseUrl = baseUrl;
-            } catch {
-              operationError = `invalid baseUrl: ${baseUrl}`;
-              data.baseUrl = baseUrl;
+            // SECURITY: the endpoint is server-authoritative. A tenant-writable
+            // baseUrl is used to send the platform credential, so it must match
+            // the provider allowlist. An invalid URL used to be persisted anyway
+            // with only an error string — that row was then called.
+            const check = checkProviderBaseUrl(provider ?? "ollama_cloud", baseUrl);
+            if (!check.ok) {
+              // Rejected: leave the stored endpoint untouched rather than
+              // persisting a URL the gateway will refuse to call.
+              operationError = check.reason ?? "baseUrl is not an approved endpoint";
+            } else {
+              data.baseUrl = check.url;
             }
           }
         }

@@ -196,10 +196,15 @@ beforeEach(() => {
   delete process.env.ACQUISITION_INGEST_KEY;
   vi.clearAllMocks();
 });
-afterEachRoute();
-function afterEachRoute() {
-  afterEach(() => { process.env = { ...OLD_ENV }; });
+/** Register an afterEach that restores process.env, optionally with extra cleanup. */
+function afterEachRoute(extra?: () => void) {
+  afterEach(() => {
+    process.env = { ...OLD_ENV };
+    extra?.();
+  });
 }
+// Whole-file default; describes below add their own teardown on top.
+afterEachRoute();
 
 function req(body?: unknown, headers?: Record<string, string>) {
   return new Request("http://test/api", {
@@ -237,33 +242,142 @@ describe("POST trial", () => {
 });
 
 describe("POST activate", () => {
-  it("member → 403; missing expiry → 400; days=30 → 200 active", async () => {
+  // The workspace `owner` role is NOT an operator. Granting paid access
+  // off-band requires ACQUISITION_GRANT_KEY; otherwise any tenant owner could
+  // mint themselves a year of paid access for nothing.
+  const OP = { "x-acquisition-grant-key": "test-operator-key" };
+
+  beforeEach(() => {
+    process.env.ACQUISITION_GRANT_KEY = "test-operator-key";
+  });
+  afterEachRoute(() => {
+    delete process.env.ACQUISITION_GRANT_KEY;
+  });
+
+  it("owner without the operator key → 403 even with a plausible body", async () => {
+    const { POST } = await import("@/app/api/acquisition/entitlement/activate/route");
+    sessionRole = "owner";
+    const r = await POST(req({ days: 30, amountPaise: 1 }));
+    expect(r.status).toBe(403);
+    expect(mem.acquisitionEntitlement).toHaveLength(0);
+  });
+
+  it("member → 403; wrong operator key → 403", async () => {
     const { POST } = await import("@/app/api/acquisition/entitlement/activate/route");
     sessionRole = "member";
-    expect((await POST(req({ days: 30 }))).status).toBe(403);
+    expect((await POST(req({ leaseType: "LEASE_30" }, OP))).status).toBe(403);
     sessionRole = "owner";
-    expect(((await POST(req({}))) as Response).status).toBe(400);
-    const r = await POST(req({ days: 30, providerRef: "UPI-1", idempotencyKey: "kk" }));
+    const r = await POST(req({ leaseType: "LEASE_30" }, { "x-acquisition-grant-key": "wrong" }));
+    expect(r.status).toBe(403);
+    expect(mem.acquisitionEntitlement).toHaveLength(0);
+  });
+
+  it("operator key + valid leaseType → 200, amount derived from the price table", async () => {
+    const { POST } = await import("@/app/api/acquisition/entitlement/activate/route");
+    const r = await POST(
+      req({ leaseType: "LEASE_90", providerRef: "UPI-1", idempotencyKey: "kk" }, OP),
+    );
     expect(r.status).toBe(200);
     const j: any = await r.json();
     expect(j.entitlement.status).toBe("active");
     expect(j.hasAccess).toBe(true);
-    expect((await POST(req("not-json" as any))).status).toBe(400);
+    // Duration and amount come from LEASE_PRICES, not the request.
+    expect(mem.acquisitionOrder[0]!.amountPaise).toBe(16_500_000);
+    const days = Math.round(
+      (new Date(j.entitlement.expiresAt).getTime() - Date.now()) / 86_400_000,
+    );
+    expect(days).toBe(90);
+  });
+
+  it("client-supplied days/amountPaise are ignored, not honoured", async () => {
+    const { POST } = await import("@/app/api/acquisition/entitlement/activate/route");
+    const r = await POST(
+      req(
+        { leaseType: "LEASE_30", days: 365, amountPaise: 1, expiresAt: "2999-01-01T00:00:00.000Z" },
+        OP,
+      ),
+    );
+    expect(r.status).toBe(200);
+    const j: any = await r.json();
+    // Not 365 days, not the year-2999 expiry the caller asked for.
+    const days = Math.round(
+      (new Date(j.entitlement.expiresAt).getTime() - Date.now()) / 86_400_000,
+    );
+    expect(days).toBe(30);
+    expect(mem.acquisitionOrder[0]!.amountPaise).toBe(6_000_000);
+  });
+
+  it("invalid leaseType → 400; bad JSON → 400", async () => {
+    const { POST } = await import("@/app/api/acquisition/entitlement/activate/route");
+    expect((await POST(req({ leaseType: "TRIAL_2D" }, OP))).status).toBe(400);
+    expect((await POST(req({ days: 30 }, OP))).status).toBe(400);
+    expect((await POST(req("not-json" as any, OP))).status).toBe(400);
+  });
+
+  it("fails closed when the operator key is unset", async () => {
+    delete process.env.ACQUISITION_GRANT_KEY;
+    const { POST } = await import("@/app/api/acquisition/entitlement/activate/route");
+    expect((await POST(req({ leaseType: "LEASE_30" }, OP))).status).toBe(403);
   });
 });
 
 describe("POST transition", () => {
+  beforeEach(() => {
+    process.env.ACQUISITION_GRANT_KEY = "test-operator-key";
+  });
+  afterEachRoute(() => {
+    delete process.env.ACQUISITION_GRANT_KEY;
+  });
+
+  async function seedEntitlement() {
+    const { POST: activate } = await import("@/app/api/acquisition/entitlement/activate/route");
+    await activate(
+      req({ leaseType: "LEASE_30" }, { "x-acquisition-grant-key": "test-operator-key" }),
+    );
+  }
+
   it("invalid action → 400; suspend/resume round-trip; bad resume → 400", async () => {
     const { POST } = await import("@/app/api/acquisition/entitlement/transition/route");
     expect((await POST(req({ action: "explode" }))).status).toBe(400);
-    const { POST: activate } = await import("@/app/api/acquisition/entitlement/activate/route");
-    await activate(req({ days: 30 }));
+    await seedEntitlement();
     expect((await POST(req({ action: "suspend" }))).status).toBe(200);
     const resumed = await POST(req({ action: "resume" }));
     expect(resumed.status).toBe(200);
     expect(((await resumed.json()) as any).entitlement.status).toBe("active");
     const bad = await POST(req({ action: "resume" }));
     expect(bad.status).toBe(400);
+  });
+
+  it("renew is operator-only and takes its duration from the price table", async () => {
+    const { POST } = await import("@/app/api/acquisition/entitlement/transition/route");
+    await seedEntitlement();
+    const before = new Date(mem.acquisitionEntitlement[0]!.expiresAt).getTime();
+    // Owner, no operator key: refused, and the expiry is untouched.
+    const denied = await POST(req({ action: "renew", days: 365, expiresAt: "2999-01-01T00:00:00.000Z" }));
+    expect(denied.status).toBe(403);
+    expect(new Date(mem.acquisitionEntitlement[0]!.expiresAt).getTime()).toBe(before);
+
+    // Operator with a leaseType: the extension is server-derived.
+    const ok = await POST(
+      req({ action: "renew", leaseType: "LEASE_90", days: 365 }, { "x-acquisition-grant-key": "test-operator-key" }),
+    );
+    expect(ok.status).toBe(200);
+    const added = Math.round(
+      (new Date(mem.acquisitionEntitlement[0]!.expiresAt).getTime() - before) / 86_400_000,
+    );
+    // 90 days from the existing expiry — not the 365 the body asked for.
+    expect(added).toBe(90);
+  });
+
+  it("refund is operator-only", async () => {
+    const { POST } = await import("@/app/api/acquisition/entitlement/transition/route");
+    await seedEntitlement();
+    expect((await POST(req({ action: "refund" }))).status).toBe(403);
+    const ok = await POST(
+      req({ action: "refund", reason: "customer request" }, { "x-acquisition-grant-key": "test-operator-key" }),
+    );
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as any).entitlement.status).toBe("refunded");
   });
 });
 

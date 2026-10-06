@@ -20,6 +20,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { directPrisma, withTenantContext, type DB } from "@wavesco/db";
+import { resolveProviderBaseUrl } from "@/lib/ai/endpoints";
 
 const GATEWAY_TOKEN = process.env.LEAD_ENGINE_GATEWAY_TOKEN;
 
@@ -181,7 +182,17 @@ export async function POST(request: NextRequest) {
   }
 
   const model = body.model ?? config.model ?? "gemma4:31b";
-  const baseUrl = config.baseUrl ?? "https://ollama.com/v1";
+  // The endpoint is server-authoritative. The tenant-writable baseUrl is only
+  // honoured when it matches the provider allowlist, so it cannot redirect
+  // OPENAI_API_KEY to an attacker host or an internal address.
+  const endpoint = resolveProviderBaseUrl(config.provider, config.baseUrl);
+  if (!endpoint.ok || !endpoint.url) {
+    return NextResponse.json(
+      { ok: false, error: "no approved endpoint for this provider", status: "endpoint_not_allowed" },
+      { status: 400 },
+    );
+  }
+  const baseUrl = endpoint.url;
   const apiKey = process.env.OPENAI_API_KEY ?? "";
 
   // 8. Call provider

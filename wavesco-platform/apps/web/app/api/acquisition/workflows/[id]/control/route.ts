@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { acquisitionDenied, auditControl, requireControlAuth } from "@/lib/wavesco/control";
+import { acquisitionDenied, auditControl, requireControlAuth, sessionRole } from "@/lib/wavesco/control";
 import { n8nBaseUrl, n8nApiKey } from "@/lib/wavesco/n8n";
 
 export const dynamic = "force-dynamic";
@@ -10,12 +10,14 @@ type Action = (typeof VALID_ACTIONS)[number];
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   let tenantId: string;
   let userId: string | null;
+  let role: string;
   try {
     const auth = await requireControlAuth();
     const denied = await acquisitionDenied(auth.tenantId);
     if (denied) return NextResponse.json(denied.body, { status: denied.status });
     tenantId = auth.tenantId;
     userId = auth.userId;
+    role = sessionRole(auth.session);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const digest = (e as { digest?: string })?.digest as string | undefined;
@@ -43,6 +45,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const action = typeof body.action === "string" ? body.action.trim() : "";
   if (!VALID_ACTIONS.includes(action as Action)) {
     return NextResponse.json({ error: "invalid action", valid: VALID_ACTIONS, received: action || null }, { status: 400 });
+  }
+
+  // ROLE GATE. This route holds the platform-wide N8N_API-KEY and can enable,
+  // disable and fire shared workflows — every tenant on the platform, not just
+  // the caller's workspace. Previously any member with a live subscription
+  // could reach it, so one tenant could switch off or trigger another
+  // tenant's automations. Reading the list (`GET /workflows`) stays open to any
+  // entitled member; changing what runs is an owner action.
+  if (role !== "owner" && role !== "admin") {
+    return NextResponse.json(
+      { error: "forbidden", reason: "Owner role required to control automations." },
+      { status: 403 },
+    );
   }
 
   // audit before proxy (always log attempt)

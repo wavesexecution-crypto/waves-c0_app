@@ -14,19 +14,25 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { withTenantContext } from "@wavesco/db";
+import { withTenantContext, directPrisma } from "@wavesco/db";
 import { runAcquisitionReconciliation } from "@/lib/wavesco/reconcile";
+import { secretMatches } from "@/lib/wavesco/operator-gate";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Every-tenant enumeration is a cross-tenant read by definition, so it must
+ * use the owner-role client explicitly rather than pretending a `system` tenant
+ * context makes it tenant-scoped: `withTenantContext("system", …)` sets
+ * `app.tenant_id = 'system'`, which under RLS returns zero rows rather than
+ * all tenants, so this silently reconciled nothing.
+ */
 async function allTenantIds(): Promise<string[]> {
-  return withTenantContext("system", async () => {
-    const rows = await (await import("@wavesco/db")).prisma.outreachOrder.findMany({
-      distinct: ["tenantId"],
-      select: { tenantId: true },
-    });
-    return rows.map((r) => r.tenantId);
+  const rows = await directPrisma().outreachOrder.findMany({
+    distinct: ["tenantId"],
+    select: { tenantId: true },
   });
+  return rows.map((r) => r.tenantId);
 }
 
 export async function POST(request: Request) {
@@ -40,7 +46,10 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
-    if (providedKey !== internalKey) {
+    // Constant-time compare, and fail closed if the key is not configured.
+    // A plain `!==` leaks the key one byte at a time to anyone who can measure
+    // the response.
+    if (!secretMatches(providedKey, internalKey)) {
       return NextResponse.json({ ok: false, error: "Invalid reconcile key." }, { status: 401 });
     }
     const url = new URL(request.url);

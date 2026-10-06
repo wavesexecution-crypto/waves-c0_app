@@ -6,6 +6,13 @@ vi.mock("@/lib/wavesco/control", () => ({
     throw new Error("UNAUTHORIZED");
   }),
   auditControl: vi.fn(async () => ({ id: "audit1" })),
+  // Mirrors the real helper: reads the role off the session, defaults to the
+  // least-privileged role.
+  sessionRole: (s: unknown) => {
+    const user = (s as { user?: { role?: unknown } } | null)?.user;
+    const role = (user as { role?: unknown } | null)?.role;
+    return role === "owner" || role === "admin" || role === "member" ? (role as string) : "member";
+  },
 }));
 
 describe("GET /api/acquisition/workflows", () => {
@@ -45,7 +52,13 @@ describe("n8n missing", () => {
   it("control returns 400 BLOCKED when N8N_BASE_URL missing", async () => {
     vi.stubEnv("N8N_BASE_URL", "");
     const { requireControlAuth } = await import("@/lib/wavesco/control");
-    vi.mocked(requireControlAuth).mockResolvedValueOnce({ tenantId: "t1", userId: "u1", session: {} } as any);
+    // Owner role: the control route is owner/admin only (it holds the platform-wide
+    // N8N_API-KEY and can enable/disable shared workflows).
+    vi.mocked(requireControlAuth).mockResolvedValueOnce({
+      tenantId: "t1",
+      userId: "u1",
+      session: { user: { id: "u1", tenantId: "t1", role: "owner" } },
+    } as any);
     const { POST } = await import("@/app/api/acquisition/workflows/[id]/control/route");
     const res = await POST(
       new Request("http://test", {

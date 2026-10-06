@@ -3,12 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { existsSync, readFileSync } from "node:fs";
+import { isAbsolute, relative, resolve } from "node:path";
 import { requireSession } from "@wavesco/auth";
 import { withTenantContext } from "@wavesco/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { recordActivity } from "@/lib/wavesco/activity";
-import { fetchManifestFile, getBatchManifest, leadEngineMode } from "@/lib/wavesco/lead-engine";
+import {
+  fetchManifestFile,
+  getBatchManifest,
+  leadEngineMode,
+  runsDir,
+} from "@/lib/wavesco/lead-engine";
 import { n8nBaseUrl } from "@/lib/wavesco/n8n";
 
 async function requireUser(): Promise<{ tenantId: string; userId: string; role: string }> {
@@ -26,6 +32,23 @@ export interface ActionState {
 function optStr(formData: FormData, name: string): string | undefined {
   const v = formData.get(name);
   return typeof v === "string" && v.length > 0 ? v : undefined;
+}
+
+/**
+ * A manifest path is engine-supplied data that reaches `readFileSync`, so it
+ * must be confined to the runs root AND the batch's own directory. Blocks
+ * `../`, absolute paths, and sibling-batch access.
+ */
+function isInsideManifestDir(p: string, batchId: string): boolean {
+  if (!isAbsolute(p)) return false;
+  const resolved = resolve(p);
+  const runsRoot = resolve(runsDir());
+  const batchDir = resolve(runsRoot, batchId);
+  const rel = relative(runsRoot, resolved);
+  if (rel.startsWith("..") || isAbsolute(rel)) return false;
+  // Must be inside <runs>/<batchId>/ — not merely somewhere under the root.
+  const relToBatch = relative(batchDir, resolved);
+  return !relToBatch.startsWith("..") && !isAbsolute(relToBatch);
 }
 
 // ------------------------------------------------------------------
@@ -177,8 +200,32 @@ export async function resendReportAction(
   const parsed = resendSchema.safeParse({ batchId: formData.get("batchId") });
   if (!parsed.success) return { ok: false, error: "Invalid batch id." };
 
+  // TENANT ISOLATION — verify the batch belongs to the caller's tenant BEFORE
+  // touching it. `getBatchManifest` searches the shared Lead Engine corpus,
+  // which has no tenant column, so an arbitrary `batchId` resolved to ANY
+  // tenant's manifest and this action then read that tenant's report files off
+  // disk and posted them to Telegram. Authorization here, not after the fetch.
+  const owned = await withTenantContext(user.tenantId, async (tx) =>
+    tx.generationBatch.findFirst({
+      where: { tenantId: user.tenantId, engineBatchId: parsed.data.batchId },
+      select: { id: true },
+    }),
+  );
+  if (!owned) {
+    return { ok: false, error: "No such batch for your workspace." };
+  }
+
   const manifest = await getBatchManifest(parsed.data.batchId);
   if (!manifest) return { ok: false, error: "Batch manifest not found on disk." };
+
+  // Path traversal: only read paths that live inside the manifest's own run
+  // directory. A manifest field is engine-supplied data, and `readFileSync` on
+  // it would otherwise read arbitrary files on the host.
+  for (const p of [manifest.pdfPath, manifest.excelPath]) {
+    if (p && !isInsideManifestDir(p, parsed.data.batchId)) {
+      return { ok: false, error: "Refusing to read a report outside its batch directory." };
+    }
+  }
 
   const files: { name: string; base64: string }[] = [];
   // Durable copies first: previously archived StoredObjects survive engine

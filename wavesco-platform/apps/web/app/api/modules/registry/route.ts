@@ -32,7 +32,19 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await auth();
-  requireSession(session);
+  const user = requireSession(session) as { tenantId?: string; role?: string };
+
+  // ROLE GATE. Registering a module calls the `module_register` SQL function,
+  // which writes to the platform-wide module catalogue — not to this tenant's
+  // rows. Any member could previously reach it. Reading the registry (GET)
+  // stays open to every signed-in tenant.
+  const role = typeof user?.role === "string" ? user.role : "member";
+  if (role !== "owner" && role !== "admin") {
+    return NextResponse.json(
+      { error: "forbidden", reason: "Owner role required to register platform modules." },
+      { status: 403 },
+    );
+  }
 
   let body: { name?: string };
   try {
