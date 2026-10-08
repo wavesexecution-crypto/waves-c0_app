@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 import { buildNavSections } from "@/lib/nav";
+import { plainSendError } from "@/lib/wavesco/send-error-text";
 
 /**
  * Acquisition UX simplification — clients operate, they do not configure.
@@ -361,8 +362,7 @@ describe("Step 04 cold mail — connect, authorize, done", () => {
     expect(page).toContain("nothing is lost");
   });
 
-  it("send confirmation path hides queue machinery", () => {
-    const panel = src("components/acquisition/submit-panel.tsx");
+  it("send confirmation path hides queue machinery", () => {    const panel = src("components/acquisition/submit-panel.tsx");
     expect(panel).toContain("for approval");
     for (const gone of ["Email Outbox", "Approval Queue", "n8n →", "SMTP"]) {
       expect(panel).not.toContain(gone);
@@ -381,5 +381,17 @@ describe("Step 04 cold mail — connect, authorize, done", () => {
     ]) {
       expect(outreach).not.toContain(gone);
     }
+  });
+
+  it("plainSendError maps WAVES-side failures, passes per-email reasons through", () => {
+    expect(
+      plainSendError("The wavesco.in domain is not verified. See https://resend.com/domains"),
+    ).toMatch(/WAVES side.*queued.*nothing is lost/);
+    expect(plainSendError("webhook 0")).toMatch(/sending service.*queued.*nothing is lost/);
+    expect(plainSendError("network unreachable")).toMatch(/queued/);
+    // Per-email reasons the client can act on pass through verbatim.
+    expect(plainSendError("mailbox full")).toBe("mailbox full");
+    expect(plainSendError("invalid recipient address")).toBe("invalid recipient address");
+    expect(plainSendError("")).toBe("");
   });
 });

@@ -9,6 +9,7 @@ import { EmailTemplateControls } from "@/components/acquisition/email-template-c
 import { brevoHealth as sendingHealth, getIntegrationsHealth } from "@/lib/wavesco/integrations";
 import { formatIST } from "@/lib/wavesco/time";
 import { readEmailMode } from "@/lib/wavesco/mail-mode";
+import { plainSendError } from "@/lib/wavesco/send-error-text";
 import { EmailModeSelector } from "@/components/acquisition/email-mode-selector";
 
 export const dynamic = "force-dynamic";
@@ -21,18 +22,6 @@ function pillForStatus(s: string): string {
   if (t === "failed" || t === "rejected" || t === "error") return "failed";
   if (t === "draft") return "never_connected";
   return t;
-}
-
-// Provider-side sending failures (e.g. an unverified sending domain) are
-// WAVES-side configuration — clients can't act on them, so they read as
-// plain status. Per-email reasons (bad address, mailbox full) pass through
-// verbatim because the client CAN act on those.
-function plainSendError(raw: unknown): string {
-  const text = String(raw ?? "").trim();
-  if (/resend|brevo|smtp|sendgrid|domain.{0,24}verif/i.test(text)) {
-    return "Email sending isn't connected on the WAVES side yet — this email stays queued, nothing is lost.";
-  }
-  return text;
 }
 
 export default async function EmailControlPage() {

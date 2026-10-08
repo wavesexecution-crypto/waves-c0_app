@@ -7,6 +7,7 @@ import { DecideButtons } from "@/components/acquisition/submit-panel";
 import { StatusPill } from "@/components/command/primitives";
 import { AutoRefresh } from "@/components/command/auto-refresh";
 import { formatIST } from "@/lib/wavesco/time";
+import { plainSendError } from "@/lib/wavesco/send-error-text";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Cold Email" };
@@ -142,16 +143,16 @@ export default async function OutreachPage() {
         ) : null}
         {(failedEmails.length > 0 || failedOrders.length > 0) ? (
           <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-red-600 dark:text-red-400">Failed — inspect sendError</p>
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-red-600 dark:text-red-400">Failed — what happened</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
               {failedEmails.slice(0, 5).map((e) => (
                 <li key={e.id} className="break-words">
-                  <span className="font-medium text-foreground">{e.business}</span> ({e.email}) — error: {String(e.error ?? (e as any).sendError ?? "unknown").slice(0, 140)}
+                  <span className="font-medium text-foreground">{e.business}</span> ({e.email}) — {plainSendError(e.error ?? (e as any).sendError ?? "unknown").slice(0, 160)}
                 </li>
               ))}
               {failedOrders.slice(0, 5).map((o) => (
                 <li key={`o-${o.id}`} className="break-words">
-                  <span className="font-medium text-foreground">{(o as any).businessName ?? o.business}</span> ({o.email}) — sendError: {String(o.sendError ?? "-").slice(0, 140)} deliveryStatus={String(o.deliveryStatus ?? "-")}
+                  <span className="font-medium text-foreground">{(o as any).businessName ?? o.business}</span> ({o.email}) — {plainSendError(o.sendError ?? "-").slice(0, 160)}
                 </li>
               ))}
             </ul>
@@ -271,8 +272,8 @@ export default async function OutreachPage() {
                     <td className="max-w-[220px] truncate px-4 py-2.5 font-sans text-[13px] text-foreground">{e.subject}</td>
                     <td className="px-4 py-2.5">
                       <StatusPill state={e.status} />
-                      {e.error ? <span className="mt-1 block max-w-[200px] break-words font-mono text-[11px] tracking-[0.02em] text-red-500">{e.error}</span> : null}
-                      {(e as any).sendError ? <span className="mt-1 block max-w-[200px] break-words font-mono text-[11px] tracking-[0.02em] text-red-500">sendError: {String((e as any).sendError).slice(0, 120)}</span> : null}
+                      {e.error ? <span className="mt-1 block max-w-[200px] break-words font-mono text-[11px] tracking-[0.02em] text-red-500" title={plainSendError(e.error)}>{plainSendError(e.error).slice(0, 120)}</span> : null}
+                      {(e as any).sendError ? <span className="mt-1 block max-w-[200px] break-words font-mono text-[11px] tracking-[0.02em] text-red-500" title={plainSendError((e as any).sendError)}>{plainSendError((e as any).sendError).slice(0, 120)}</span> : null}
                     </td>
                     <td className="px-4 py-2.5 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{e.approvalId ?? "-"}</td>
                     <td className="px-4 py-2.5 font-mono text-[11px] leading-relaxed tracking-[0.02em] text-muted-foreground">
