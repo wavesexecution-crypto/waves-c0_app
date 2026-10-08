@@ -77,7 +77,7 @@ export function CampaignSubmitPanel({
       </label>
       <label className="flex items-start gap-2 text-xs">
         <input type="checkbox" checked={acknowledged} onChange={(e) => { setAcknowledged(e.target.checked); }} className="mt-0.5 h-3.5 w-3.5" />
-        Queue <strong>{eligible}</strong> email(s) into the existing Approval Queue (n8n → Email Outbox → SMTP).
+        Queue <strong>{eligible}</strong> email(s) for approval.
         Nothing sends until each item is approved.
       </label>
       <div className="flex gap-2">

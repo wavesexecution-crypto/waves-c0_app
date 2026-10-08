@@ -97,13 +97,13 @@ export default async function OutreachPage() {
         <div>
           <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Cold Email</h1>
           <p className="mt-1 max-w-3xl font-sans text-[13px] leading-5 text-muted-foreground">
-            Pipeline over the existing production path: Approval Queue → Email Outbox → SMTP. Approve or reject here or via Telegram — both reach the same delivery pipeline. Delivery state is tenant-scoped and audit-logged.
+            Approve or reject each email here. Nothing sends until you approve it.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={10_000} />
           <Link href="/acquisition/email" className="rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90">
-            Email Control
+            Email
           </Link>
           <Link href="/acquisition/campaigns" className="rounded-lg border border-border/80 bg-card px-3 py-1.5 font-sans text-[13px] text-foreground hover:bg-muted/50">
             Campaigns
@@ -117,7 +117,7 @@ export default async function OutreachPage() {
           <h2 className="font-display text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">Delivery State — Inspection</h2>
           <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{emails.length} OutreachEmail · {orders.length} OutreachOrder</span>
         </div>
-        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Real statuses: submitted / approved / sent / failed plus <span className="font-mono">sendError</span> / <span className="font-mono">error</span> verbatim. No fake telemetry.</p>
+        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Every email shows its real state. Nothing here is made up.</p>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {PIPELINE.slice(0, 4).map((s) => (
             <div key={`email-${s}`} className="rounded-lg border border-border/80 bg-muted/20 p-3 text-center">
@@ -169,7 +169,7 @@ export default async function OutreachPage() {
             <StatusPill state={templatesStatus === "ok" ? "connected" : "disconnected"} />
             <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{templatesStatus} · {templates.length} templates</span>
             <Link href="/acquisition/email" className="rounded-lg border border-border/80 px-2.5 py-1 font-sans text-[13px] text-foreground hover:bg-muted/50">
-              Manage in Email Control
+              Manage in Email
             </Link>
           </div>
         </div>
@@ -177,7 +177,7 @@ export default async function OutreachPage() {
         {templates.length === 0 ? (
           <div className="mt-3 rounded-lg border border-dashed border-border/80 p-4 text-center">
             <p className="font-sans text-[13px] text-muted-foreground">
-              No templates yet — create one in Email Control. Supports <code className="rounded bg-muted px-1 font-mono">{"{{business}}"}</code> <code className="rounded bg-muted px-1 font-mono">{"{{city}}"}</code> vars. API returns <span className="font-mono tabular-nums">not_configured</span> when EmailTemplate table missing, with empty array (never 500).
+              No templates yet — create one in Email. Supports <code className="rounded bg-muted px-1 font-mono">{"{{business}}"}</code> <code className="rounded bg-muted px-1 font-mono">{"{{city}}"}</code> vars. API returns <span className="font-mono tabular-nums">not_configured</span> when EmailTemplate table missing, with empty array (never 500).
             </p>
             <div className="mt-2">
               <Link href="/acquisition/email" className="rounded-lg bg-primary px-3 py-1.5 font-sans text-[13px] font-medium text-primary-foreground hover:bg-primary/90">
@@ -211,11 +211,11 @@ export default async function OutreachPage() {
 
       {/* Preview */}
       <section className="rounded-lg border border-border/80 bg-card p-4">
-        <h2 className="font-display text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">Preview — Render without sending</h2>
-        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Preview calls <code className="rounded bg-muted px-1 font-mono">POST /api/acquisition/email/templates</code> with <span className="font-mono">{"{ action: \"preview\", template: { subject, body }, vars: { business, city } }"}</span> — pure server-side render, audit-logged as <span className="font-mono">email.template.preview</span>, never hits Brevo/SMTP.</p>
+        <h2 className="font-display text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">Preview — see it before it sends</h2>
+        <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Preview shows exactly how the email reads for a prospect. Previews never send anything.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
-            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Template (raw)</p>
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Your message</p>
             <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-foreground">Subject: {String(sampleTemplate.subject)}</p>
             <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-border/80 bg-card p-2 font-mono text-[11px] leading-5 tracking-[0.02em] text-foreground">{String(sampleTemplate.body)}</pre>
             <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Vars: business={sampleVars.business}, city={sampleVars.city}</p>
@@ -224,9 +224,9 @@ export default async function OutreachPage() {
             <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Rendered — no send</p>
             <p className="mt-1 font-sans text-[13px] font-medium text-foreground">Subject: {preview.subject}</p>
             <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-border/80 bg-card p-2 font-mono text-[11px] leading-5 tracking-[0.02em] text-foreground">{preview.body}</pre>
-            <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Try live preview in Email Control → Templates → Preview (no send).</p>
+            <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Try live preview in Email → Your message.</p>
             <Link href="/acquisition/email" className="mt-2 inline-flex rounded-lg border border-border/80 px-2.5 py-1 font-sans text-[13px] text-foreground hover:bg-muted/50">
-              Open Email Control
+              Open Email
             </Link>
           </div>
         </div>
@@ -296,7 +296,7 @@ export default async function OutreachPage() {
           </div>
 
           <p className="font-mono text-[11px] leading-relaxed tracking-[0.02em] text-muted-foreground">
-            Note: &quot;approved&quot; means the decision reached the existing decide endpoint; &quot;sent&quot; is set only when that response confirms dispatch through Email Outbox. Delivery/bounce/reply telemetry does not exist upstream yet and is therefore never shown here — see Email Control for deliveryState + sendError when OutreachOrder is present.
+            Note: &quot;approved&quot; means you approved the email; &quot;sent&quot; is set only once sending is confirmed. Replies show up when they arrive — nothing is guessed.
           </p>
         </>
       )}

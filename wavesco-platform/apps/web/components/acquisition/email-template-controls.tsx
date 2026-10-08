@@ -37,7 +37,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
       if (!res.ok) throw new Error(json.error ?? `Preview failed ${res.status}`);
       const p = json.preview ?? json.rendered ?? json;
       setPreview({ subject: p.subject ?? "", body: p.body ?? "" });
-      setMessage("Preview rendered — no email sent (server-side render only, audit-logged as email.template.preview)");
+      setMessage("Preview ready — no email sent.");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -62,7 +62,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
         setTemplates((prev) => [tmpl, ...prev]);
         setSelectedId(tmpl.id);
       }
-      setMessage(`Template created ${tmpl?.id ?? ""} — audit-logged as email.template.create`);
+      setMessage("Template created.");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -90,7 +90,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
       if (tmpl) {
         setTemplates((prev) => prev.map((t) => (t.id === tmpl.id ? tmpl : t)));
       }
-      setMessage(`Template updated ${tmpl?.id ?? selectedId} — audit-logged as email.template.update`);
+      setMessage("Template updated.");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -103,17 +103,17 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
     setBody(t.body);
     setSelectedId(t.id);
     setPreview(null);
-    setMessage(`Loaded template ${t.id}`);
+    setMessage("Template loaded — edit below, then Update to save.");
   }
 
   return (
     <div className="space-y-4 rounded-lg border border-border/80 bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-sans text-[13px] font-semibold">Templates — Manage &amp; Preview</h3>
+          <h3 className="font-sans text-[13px] font-semibold">Your message</h3>
           <p className="font-sans text-[13px] leading-5 text-muted-foreground">
-            List, create, update, and preview templates. Preview renders with <code className="rounded bg-muted px-1 py-0.5">{"{{business}}"}</code>{" "}
-            <code className="rounded bg-muted px-1 py-0.5">{"{{city}}"}</code> without sending — audit-logged as email.template.preview.
+            Write your message with placeholders like <code className="rounded bg-muted px-1 py-0.5">{"{{business}}"}</code> and{" "}
+            <code className="rounded bg-muted px-1 py-0.5">{"{{city}}"}</code> — preview shows exactly how it reads for a prospect. Previews never send.
           </p>
         </div>
         <span className="rounded-full border px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">{templates.length} templates</span>
@@ -150,7 +150,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
         </div>
       ) : (
         <div className="rounded-lg border border-border/80 border-dashed p-4 text-center text-xs text-muted-foreground">
-          No templates yet — create one below. Templates are tenant-scoped and audit-logged. If EmailTemplate table not configured, templates persist as ActivityEvent (type=email_template) or in-memory.
+          No message templates yet — write your first message below.
         </div>
       )}
 
@@ -188,7 +188,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
             <input value={varsEmail} onChange={(e) => setVarsEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 text-xs" />
           </label>
         </div>
-        {selectedId ? <p className="text-[11px] text-muted-foreground">Editing template: <span className="font-mono">{selectedId}</span></p> : null}
+        {selectedId ? <p className="text-[11px] text-muted-foreground">Editing — press Update to save your changes.</p> : null}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -231,7 +231,7 @@ export function EmailTemplateControls({ initialTemplates }: { initialTemplates: 
             <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Preview — Rendered (no send)</p>
             <p className="mt-1 font-sans text-[13px] font-medium">Subject: {preview.subject}</p>
             <pre className="mt-2 whitespace-pre-wrap break-words rounded bg-card p-2 text-xs">{preview.body}</pre>
-            <p className="mt-2 text-[11px] text-muted-foreground">Variables: business={varsBiz}, city={varsCity}, email={varsEmail} — rendered server-side via POST preview, audit-logged.</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">Shown with business={varsBiz}, city={varsCity}, email={varsEmail} filled in.</p>
           </div>
         ) : null}
         {message ? <p className="text-xs text-emerald-600 dark:text-emerald-400">{message}</p> : null}

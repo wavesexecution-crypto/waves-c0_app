@@ -53,6 +53,6 @@ export function withEmailMode(
 /** Client-facing copy for a mode (no internal infrastructure terms). */
 export function emailModeLabel(mode: EmailMode): string {
   return mode === "waves_managed"
-    ? "Waves handles email"
-    : "Use our email system";
+    ? "WAVES handles it"
+    : "Connect my email";
 }

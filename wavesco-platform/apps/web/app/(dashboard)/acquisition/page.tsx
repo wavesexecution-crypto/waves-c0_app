@@ -32,9 +32,10 @@ export default async function AcquisitionPage() {
   }
 
   // Platform counts must never take the whole dashboard down.
-  let counts = { campaigns: 0, queuedEmails: 0, sentEmails: 0, failedEmails: 0, followUpsPending: 0 };
+  let counts = { campaigns: 0, queuedEmails: 0, sentEmails: 0, failedEmails: 0, followUpsPending: 0, followUpsOverdue: 0, repliesWaiting: 0 };
   let countsError: string | null = null;
   try {
+    const now = new Date();
     counts = await withTenantContext(tenantId, async (tx) => ({
       campaigns: await tx.campaign.count({ where: { tenantId } }),
       queuedEmails: await tx.outreachEmail.count({
@@ -43,9 +44,39 @@ export default async function AcquisitionPage() {
       sentEmails: await tx.outreachEmail.count({ where: { tenantId, status: "sent" } }),
       failedEmails: await tx.outreachEmail.count({ where: { tenantId, status: "failed" } }),
       followUpsPending: await tx.followUp.count({ where: { tenantId, status: "pending" } }),
+      followUpsOverdue: await tx.followUp.count({ where: { tenantId, status: "pending", dueAt: { lt: now } } }),
+      repliesWaiting: await tx.conversation.count({ where: { tenantId, status: "OPEN" } }),
     }));
   } catch (e) {
     countsError = safeErrorText(e, "Platform counters are temporarily unavailable.", "acquisition:counts");
+  }
+
+  const attention: { label: string; detail: string; href: string }[] = [];
+  if (!countsError) {
+    if (counts.repliesWaiting > 0)
+      attention.push({
+        label: `${counts.repliesWaiting} ${counts.repliesWaiting === 1 ? "reply is" : "replies are"} waiting on you`,
+        detail: "Read and respond in Replies.",
+        href: "/acquisition/replies",
+      });
+    if (counts.failedEmails > 0)
+      attention.push({
+        label: `${counts.failedEmails} ${counts.failedEmails === 1 ? "email" : "emails"} failed to send`,
+        detail: "Review what happened in Outreach.",
+        href: "/acquisition/outreach",
+      });
+    if (counts.followUpsOverdue > 0)
+      attention.push({
+        label: `${counts.followUpsOverdue} overdue ${counts.followUpsOverdue === 1 ? "follow-up" : "follow-ups"}`,
+        detail: "Catch up in Follow-ups.",
+        href: "/acquisition/follow-ups",
+      });
+    if (counts.queuedEmails > 0)
+      attention.push({
+        label: `${counts.queuedEmails} ${counts.queuedEmails === 1 ? "email" : "emails"} waiting to send`,
+        detail: "Review them in Outreach.",
+        href: "/acquisition/outreach",
+      });
   }
 
   const engineRun = stats ? await safeRun() : null;
@@ -68,16 +99,40 @@ export default async function AcquisitionPage() {
             Acquisition OS
           </h1>
           <p className="mt-1.5 max-w-2xl font-sans text-[13px] leading-5 text-muted-foreground">
-            Control layer over the existing Lead Engine, Approval Queue / Email Outbox and Notify Hub.
+            Your client acquisition, handled by WAVES. Here is what is happening and what needs you.
           </p>
         </div>
         <AutoRefresh intervalMs={30_000} />
       </div>
 
+      {!countsError ? (
+        <section className="rounded-lg border border-border/80 bg-card p-5">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Needs your attention
+          </p>
+          {attention.length === 0 ? (
+            <p className="mt-2 font-sans text-sm font-medium tracking-[-0.01em] text-foreground">
+              All clear — nothing needs you right now.
+            </p>
+          ) : (
+            <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+              {attention.map((a) => (
+                <li key={a.href + a.label}>
+                  <Link href={a.href} className="block h-full rounded-lg border border-border/80 p-4 transition-colors hover:border-border-strong hover:bg-card-hover">
+                    <p className="font-sans text-[13px] font-medium tracking-[-0.01em] text-foreground">{a.label}</p>
+                    <p className="mt-1 font-sans text-xs leading-5 text-muted-foreground">{a.detail}</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
       <section className="space-y-3">
         <SectionHeader
-          title="Corpus"
-          subtitle={statsError ?? `Last researched ${relativeFrom(stats?.lastResearchedAt)}`}
+          title="Your leads"
+          subtitle={statsError ?? `Prospects WAVES has found for you · last updated ${relativeFrom(stats?.lastResearchedAt)}`}
           right={<StatusPill state={statsError ? "error" : "live"} />}
         />
         {stats && facets ? (
@@ -106,8 +161,8 @@ export default async function AcquisitionPage() {
 
       <section className="space-y-3">
         <SectionHeader
-          title="Platform state"
-          subtitle={countsError ?? "Your workspace — campaigns, sends and follow-ups"}
+          title="Your outreach"
+          subtitle={countsError ?? "Emails WAVES is sending, plus nudges you scheduled"}
           right={countsError ? <StatusPill state="error" /> : undefined}
         />
         {countsError ? (
@@ -120,9 +175,9 @@ export default async function AcquisitionPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <MetricCard label="Campaigns" value={counts.campaigns} href="/acquisition/campaigns" />
-            <MetricCard label="Queued emails" value={counts.queuedEmails} href="/acquisition/outreach" />
+            <MetricCard label="Waiting to send" value={counts.queuedEmails} href="/acquisition/outreach" />
             <MetricCard label="Sent" value={counts.sentEmails} href="/acquisition/outreach" />
-            <MetricCard label="Failed" value={counts.failedEmails} href="/acquisition/outreach" />
+            <MetricCard label="Failed to send" value={counts.failedEmails} href="/acquisition/outreach" />
             <MetricCard label="Follow-ups pending" value={counts.followUpsPending} href="/acquisition/follow-ups" />
           </div>
         )}
@@ -138,9 +193,9 @@ export default async function AcquisitionPage() {
           </p>
           <ol className="mt-3 grid gap-3 sm:grid-cols-3">
             {[
-              { n: 1, href: "/acquisition/profile", title: "Describe your business", desc: "Tell the OS who you sell to, where, and what you offer." },
-              { n: 2, href: "/acquisition/generate", title: "Generate leads", desc: "Run the Lead Engine to research and verify prospects." },
-              { n: 3, href: "/acquisition/campaigns", title: "Create a campaign", desc: "Pick a segment, review eligibility, then queue for approval." },
+              { n: 1, href: "/acquisition/profile", title: "Describe your business", desc: "Tell WAVES who you sell to, where, and what you offer." },
+              { n: 2, href: "/acquisition/generate", title: "Find prospects", desc: "WAVES researches and verifies prospects for you." },
+              { n: 3, href: "/acquisition/campaigns", title: "Start your outreach", desc: "Pick who to reach, review who's eligible, then approve the send." },
             ].map((s) => (
               <li key={s.n}>
                 <Link href={s.href} className="block h-full rounded-lg border border-border/80 bg-card-hover/40 p-4 transition-colors hover:border-border-strong hover:bg-card-hover">
@@ -156,10 +211,10 @@ export default async function AcquisitionPage() {
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { href: "/acquisition/profile", title: "Company Profile", desc: "What the OS knows about your business." },
-          { href: "/acquisition/generate", title: "Generate Leads", desc: "Run the Lead Engine pipeline." },
-          { href: "/acquisition/leads", title: "Leads", desc: "Search the corpus with filters and profiles." },
-          { href: "/acquisition/campaigns", title: "Campaigns", desc: "Exact eligibility preview before any send." },
+          { href: "/acquisition/profile", title: "Setup", desc: "What WAVES knows about your business." },
+          { href: "/acquisition/leads", title: "Leads", desc: "Prospects WAVES found for you." },
+          { href: "/acquisition/outreach", title: "Outreach", desc: "Emails WAVES is sending, waiting for your approval." },
+          { href: "/acquisition/analytics", title: "Reports", desc: "How your outreach is doing." },
         ].map((c) => (
           <Link key={c.href} href={c.href} className="rounded-lg border border-border/80 bg-card p-4 transition-colors hover:border-border-strong hover:bg-card-hover">
             <p className="font-sans text-[13px] font-medium tracking-[-0.01em] text-foreground">{c.title}</p>
@@ -170,8 +225,8 @@ export default async function AcquisitionPage() {
 
       {engineRun ? (
         <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
-          Engine last run: {formatIST(engineRun.started_at)} → {formatIST(engineRun.finished_at)} · added{" "}
-          <span className="tabular-nums">{engineRun.added ?? 0}</span> · Telegram {engineRun.telegram_status ?? "—"}
+          Prospect research last ran: {formatIST(engineRun.started_at)} → {formatIST(engineRun.finished_at)} · added{" "}
+          <span className="tabular-nums">{engineRun.added ?? 0}</span> new prospects
         </p>
       ) : null}
 

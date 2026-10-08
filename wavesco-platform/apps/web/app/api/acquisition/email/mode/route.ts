@@ -29,7 +29,7 @@ function modePayload(mode: EmailMode) {
     status: mode === "waves_managed" ? "active" : "setup_pending",
     description:
       mode === "waves_managed"
-        ? "Waves manages the email infrastructure for your acquisition campaigns. Nothing for you to configure."
+        ? "WAVES sends your outreach for you. Nothing for you to configure."
         : "We've recorded that you want your own mailbox used. A Waves specialist will connect it with you — until then your campaigns keep sending through Waves-managed email.",
   };
 }

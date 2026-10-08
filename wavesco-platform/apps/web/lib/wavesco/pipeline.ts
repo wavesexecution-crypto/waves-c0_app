@@ -711,7 +711,7 @@ export async function reconcileOrderSend(tenantId: string, orderId: string): Pro
 
     if (found && sendStatus === "sent") {
       const senderIdentity =
-        process.env.SMTP_FROM?.trim() ?? "waves.execution@gmail.com (via existing n8n Email Outbox)";
+        process.env.SMTP_FROM?.trim() || "WAVES-managed sending";
       const now2 = new Date();
       await tx.outreachOrder.update({
         where: { id: orderId },

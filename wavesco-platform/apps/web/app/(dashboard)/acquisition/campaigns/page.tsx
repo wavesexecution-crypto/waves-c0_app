@@ -115,6 +115,9 @@ async function CampaignCard({
             <Link href={`/acquisition/campaigns/${c.id}`} className="rounded-lg border border-border/80 px-2.5 py-1 font-sans text-[13px] text-foreground hover:bg-muted/50">
               Configure
             </Link>
+            <Link href={`/acquisition/campaigns?from=${encodeURIComponent(c.id)}#new-campaign`} className="rounded-lg border border-border/80 px-2.5 py-1 font-sans text-[13px] text-foreground hover:bg-muted/50">
+              Run again
+            </Link>
           </div>
         </div>
       </div>
@@ -142,9 +145,14 @@ async function loadCampaigns(tenantId: string) {
   );
 }
 
-export default async function CampaignsPage() {
+export default async function CampaignsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
   const session = await auth();
   const tenantId = requireTenantId(session);
+  const sp = await searchParams;
 
   let facets: Awaited<ReturnType<typeof getFacets>> | null = null;
   let engineError: string | null = null;
@@ -156,14 +164,26 @@ export default async function CampaignsPage() {
 
   const campaigns = await loadCampaigns(tenantId);
 
+  // "Run again" prefill: copy the previous campaign's audience into the form.
+  // The form only applies values that still exist — stale ones fall back to "all".
+  const fromId = typeof sp.from === "string" ? sp.from : null;
+  const prefillSource = fromId ? campaigns.find((c: any) => c.id === fromId) ?? null : null;
+  const prefill = prefillSource
+    ? {
+        name: `Copy of ${(prefillSource as any).name ?? "campaign"}`.slice(0, 80),
+        location: (prefillSource as any).location ?? undefined,
+        category: (prefillSource as any).category ?? undefined,
+        tier: (prefillSource as any).tier ?? undefined,
+      }
+    : undefined;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Campaigns</h1>
           <p className="mt-1 max-w-3xl font-sans text-[13px] leading-5 text-muted-foreground">
-            Segments are counted against the live lead corpus. Sends go through the existing Approval Queue — the
-            platform never sends email itself.
+            Choose who to reach. WAVES checks who&apos;s eligible, then every email waits for your approval before sending.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -190,6 +210,11 @@ export default async function CampaignsPage() {
 
       <section id="new-campaign" className="space-y-3">
         <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">New campaign</h2>
+        {prefillSource ? (
+          <p className="font-sans text-[13px] leading-5 text-muted-foreground">
+            Prefilled from “{(prefillSource as any).name}” — adjust anything and create. Eligibility is checked live before anything can be queued.
+          </p>
+        ) : null}
         {engineError || !facets ? (
           <div className="rounded-lg border border-dashed border-red-500/30 bg-card p-4">
             <p className="font-sans text-[13px] font-medium text-foreground">Cannot build segments — Lead Engine unavailable</p>
@@ -199,7 +224,7 @@ export default async function CampaignsPage() {
             </a>
           </div>
         ) : (
-          <CampaignCreateForm cities={facets.cities} categories={facets.categories} />
+          <CampaignCreateForm cities={facets.cities} categories={facets.categories} initial={prefill} />
         )}
       </section>
 

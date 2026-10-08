@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { withTenantContext } from "@wavesco/db";
@@ -7,7 +8,7 @@ import { MetricCard, SectionHeader, StatusPill } from "@/components/command/prim
 import { AutoRefresh } from "@/components/command/auto-refresh";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Analytics — Acquisition OS" };
+export const metadata: Metadata = { title: "Reports" };
 
 function pct(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
@@ -31,9 +32,15 @@ async function safeCount(tx: any, model: string, where: any): Promise<number> {
   }
 }
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ detail?: string }>;
+}) {
   const session = await auth();
   const tenantId = requireTenantId(session as unknown);
+  const sp = await searchParams;
+  const showDetail = sp.detail === "full";
 
   // acquisition via lead engine
   let acquisition: {
@@ -394,19 +401,19 @@ export default async function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Intelligence</p>
-          <h1 className="mt-1 font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Analytics — Acquisition OS</h1>
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Reports</p>
+          <h1 className="mt-1 font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Reports</h1>
           <p className="mt-1.5 max-w-2xl font-sans text-[13px] leading-5 text-muted-foreground">
-            Tenant-scoped acquisition metrics, campaign performance, funnel, response rates, workflow, API usage, model/token usage, system costs.
+            How your outreach is doing — real numbers from your workspace. First what worked, then the detail.
           </p>
           <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
-            Tenant {tenantId.slice(0, 8)}… · Acquisition live via getLeadStats (corpus) + tenant DB aggregates. Zeros if empty, not error.
+            Zeros mean nothing has happened yet — never an error.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <AutoRefresh intervalMs={30_000} />
           <StatusPill state={acquisitionError ? "error" : hasData ? "connected" : "unavailable"} />
-          <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{acquisitionError ? "ERROR" : hasData ? "LIVE" : "EMPTY"}</span>
+          <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{acquisitionError ? "Needs attention" : hasData ? "Up to date" : "Nothing yet"}</span>
         </div>
       </div>
 
@@ -429,14 +436,91 @@ export default async function AnalyticsPage() {
         </div>
       ) : null}
 
+      {/* What worked — plain-language summary computed from the same real aggregates below. */}
+      <section className="rounded-lg border border-border/80 bg-card p-5">
+        <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          What worked
+        </p>
+        <div className="mt-2 space-y-1.5 font-sans text-[13px] leading-5 text-foreground">
+          {campaign.sent === 0 && campaign.total === 0 ? (
+            <p>Nothing sent yet. When WAVES sends your first emails, this page will tell you what worked and what to do next.</p>
+          ) : (
+            <>
+              <p>
+                WAVES sent <strong className="tabular-nums">{formatInt(campaign.sent)}</strong> {campaign.sent === 1 ? "email" : "emails"}.{" "}
+                <strong className="tabular-nums">{formatInt(campaign.reply)}</strong> {campaign.reply === 1 ? "person" : "people"} replied
+                {campaign.sent > 0 ? (
+                  <> — a <strong className="tabular-nums">{(responseRates.replyRate * 100).toFixed(1)}%</strong> reply rate.</>
+                ) : (
+                  <>.</>
+                )}
+              </p>
+              {(() => {
+                const stages = funnel.stages ?? [];
+                let worst: { from: string; to: string; lost: number } | null = null;
+                for (let i = 1; i < stages.length; i++) {
+                  const prev = stages[i - 1]!.value ?? 0;
+                  const cur = stages[i]!.value ?? 0;
+                  const lost = prev - cur;
+                  if (prev > 0 && lost > 0 && (!worst || lost > worst.lost)) {
+                    worst = { from: stages[i - 1]!.label, to: stages[i]!.label, lost };
+                  }
+                }
+                if (!worst) return null;
+                return (
+                  <p>
+                    Most drop-off is between <strong>{worst.from}</strong> and <strong>{worst.to}</strong> — that&apos;s the step to improve next.
+                  </p>
+                );
+              })()}
+              {campaign.failed > 0 ? (
+                <p>
+                  <strong className="tabular-nums">{formatInt(campaign.failed)}</strong> {campaign.failed === 1 ? "email" : "emails"} failed to send. Each one keeps its reason — nothing is silently dropped.
+                </p>
+              ) : null}
+              {acquisition.optedOut > 0 ? (
+                <p>
+                  <strong className="tabular-nums">{formatInt(acquisition.optedOut)}</strong> {acquisition.optedOut === 1 ? "person" : "people"} asked not to be contacted — WAVES excludes them automatically.
+                </p>
+              ) : null}
+              {acquisition.bounced > 0 ? (
+                <p>
+                  <strong className="tabular-nums">{formatInt(acquisition.bounced)}</strong> {acquisition.bounced === 1 ? "address" : "addresses"} bounced — they can&apos;t receive email.
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+        <div className="mt-4">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            What to do next
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            {campaign.reply > 0 ? (
+              <Link href="/acquisition/replies" className="rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground hover:bg-primary/90">
+                Read your replies →
+              </Link>
+            ) : null}
+            {campaign.failed > 0 ? (
+              <Link href="/acquisition/outreach" className="rounded-md border px-3 py-1.5 hover:bg-accent">
+                See failed sends →
+              </Link>
+            ) : null}
+            <Link href="/acquisition/campaigns#new-campaign" className="rounded-md border px-3 py-1.5 hover:bg-accent">
+              Start your outreach →
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Acquisition metrics */}
       <section className="space-y-3">
-        <SectionHeader title="Acquisition metrics" subtitle="Corpus (Lead Engine) + tenant DB fallback" right={<span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{acquisition.lastResearchedAt ? `lastResearched ${new Date(acquisition.lastResearchedAt).toLocaleString()}` : "no lastResearched"}</span>} />
+        <SectionHeader title="Acquisition metrics" subtitle="Prospects found, ready, contacted and replied" right={<span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">{acquisition.lastResearchedAt ? `updated ${new Date(acquisition.lastResearchedAt).toLocaleString()}` : "not updated yet"}</span>} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="Total Leads" value={formatInt(acquisition.total)} detail={`${Object.keys(acquisition.byTier).length} tiers · optedOut ${acquisition.optedOut} · bounced ${acquisition.bounced}`} href="/acquisition/leads" />
-          <MetricCard label="Email Ready" value={formatInt(acquisition.emailReady)} detail="VERIFIED + not opted_out + not contacted" href="/acquisition/campaigns" />
-          <MetricCard label="Contacted" value={formatInt(acquisition.contacted)} detail="date_contacted not null (engine) or outreach sent" href="/acquisition/outreach" />
-          <MetricCard label="Replies" value={formatInt(acquisition.replies)} detail="reply_status not empty · also OutreachOrder.replyStatus" href="/acquisition/outreach" />
+          <MetricCard label="Email Ready" value={formatInt(acquisition.emailReady)} detail="Verified address, ready to contact" href="/acquisition/campaigns" />
+          <MetricCard label="Contacted" value={formatInt(acquisition.contacted)} detail="Already reached by WAVES outreach" href="/acquisition/outreach" />
+          <MetricCard label="Replies" value={formatInt(acquisition.replies)} detail="Prospects who replied" href="/acquisition/replies" />
         </div>
         {Object.keys(acquisition.byTier).length > 0 ? (
           <div className="rounded-lg border border-border/80 bg-card p-3">
@@ -454,13 +538,13 @@ export default async function AnalyticsPage() {
 
       {/* Campaign performance */}
       <section className="space-y-3">
-        <SectionHeader title="Campaign performance" subtitle="Eligible vs sent vs reply (tenant-scoped)" />
+        <SectionHeader title="Campaign performance" subtitle="Who could be reached, who was sent to, who replied" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <MetricCard label="Campaigns" value={formatInt(campaign.total)} href="/acquisition/campaigns" />
-          <MetricCard label="Eligible (emailReady)" value={formatInt(campaign.eligible)} detail="from acquisition.emailReady" />
+          <MetricCard label="Eligible" value={formatInt(campaign.eligible)} detail="Ready to contact right now" />
           <MetricCard label="Sent" value={formatInt(campaign.sent)} detail={`queued ${campaign.queued} · pending ${campaign.pending}`} />
-          <MetricCard label="Failed" value={formatInt(campaign.failed)} detail="OutreachEmail failed" />
-          <MetricCard label="Replied" value={formatInt(campaign.reply)} detail="OutreachOrder replyStatus not null" />
+          <MetricCard label="Failed" value={formatInt(campaign.failed)} detail="Didn't send" />
+          <MetricCard label="Replied" value={formatInt(campaign.reply)} detail="Replied to outreach" />
         </div>
         <div className="rounded-lg border border-border/80 bg-card p-3">
           <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Eligible vs Sent vs Reply — bar snapshot</p>
@@ -479,7 +563,7 @@ export default async function AnalyticsPage() {
               </div>
             ))}
           </div>
-          <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Bars scaled to max(eligible,sent,reply). Source: tenant campaign + outreachEmail + outreachOrder.</p>
+          <p className="mt-2 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Bars scaled to the largest value.</p>
         </div>
       </section>
 
@@ -499,13 +583,13 @@ export default async function AnalyticsPage() {
               </div>
             ))}
           </div>
-          <p className="mt-3 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Pct = value / total. Total from getLeadStats, contacted max(engine contacted, sent), replied max(engine replies, orderReplied).</p>
+          <p className="mt-3 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Each bar is the share of all prospects at that step.</p>
         </div>
       </section>
 
       {/* Response rates */}
       <section className="space-y-3">
-        <SectionHeader title="Response rates" subtitle="Replies / sent + eligible coverage" />
+        <SectionHeader title="Response rates" subtitle="How often outreach gets replies" />
         <div className="grid gap-4 sm:grid-cols-3">
           <MetricCard label="Reply Rate" value={pct(responseRates.replyRate)} detail={`${responseRates.raw.replies} replies / ${responseRates.raw.sent} sent`} />
           <MetricCard label="Sent Rate" value={pct(responseRates.sentRate)} detail={`${responseRates.raw.sent} sent / ${responseRates.raw.eligible} eligible`} />
@@ -516,11 +600,16 @@ export default async function AnalyticsPage() {
           <div className="mt-2 h-3 rounded-full bg-muted">
             <div className="h-3 rounded-full bg-violet-500" style={{ width: `${Math.round(responseRates.replyRate * 100)}%` }} />
           </div>
-          <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Zero if no sends yet — not error. Raw: {JSON.stringify(responseRates.raw)}</p>
+          <p className="mt-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground">Zero until your first sends.</p>
         </div>
       </section>
 
-      {/* Workflow performance */}
+      {showDetail ? (
+        <>
+          <Link href="/acquisition/analytics" className="inline-block font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground hover:text-foreground hover:underline">
+            ← Back to summary
+          </Link>
+          {/* Workflow performance */}
       <section className="space-y-3">
         <SectionHeader title="Workflow performance" subtitle="ActivityEvent by type + IntegrationStatus by state" />
         <div className="grid gap-4 sm:grid-cols-3">
@@ -696,6 +785,18 @@ export default async function AnalyticsPage() {
           </div>
         </div>
       </section>
+        </>
+      ) : (
+        <section className="rounded-lg border border-border/80 bg-card p-5">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Technical detail</p>
+          <p className="mt-2 font-sans text-[13px] leading-5 text-muted-foreground">
+            The full breakdown — automation runs, usage and costs — lives here for when you need it.
+          </p>
+          <Link href="/acquisition/analytics?detail=full" className="mt-3 inline-block rounded-lg border border-border/80 px-3 py-1.5 text-xs hover:bg-accent">
+            Show technical detail
+          </Link>
+        </section>
+      )}
 
       <p className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
         All metrics reflect your workspace's actual activity. Metrics show zero until your first campaigns run.</p>

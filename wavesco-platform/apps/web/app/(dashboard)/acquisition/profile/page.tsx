@@ -14,7 +14,7 @@ const STEP_GROUPS: { label: string; keys: string[]; optional?: boolean }[] = [
   { label: "Ideal customer", keys: ["icp.targetCustomer", "icp.geography"] },
   { label: "Offer", keys: ["offer.productService"] },
   { label: "Brand", keys: [], optional: true },
-  { label: "Infrastructure", keys: [], optional: true },
+  { label: "Preferences", keys: [], optional: true },
   { label: "Rules", keys: [], optional: true },
   { label: "Review & Activate", keys: [] },
 ];
@@ -50,14 +50,14 @@ export default async function AcquisitionProfilePage() {
           <Link href="/acquisition" className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground hover:text-foreground">
             ← Back to Acquisition OS
           </Link>
-          <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">One Waves account · tenant-isolated</span>
+          <span className="font-mono text-[11px] tracking-[0.02em] text-muted-foreground">One Waves account</span>
         </div>
 
         <div className="mt-4 rounded-lg border border-border/80 bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Onboarding · {doneCount} of {requiredGroups.length - 1} required sections complete · Status{" "}
+                Setup · {doneCount} of {requiredGroups.length - 1} essentials done · Status{" "}
                 {profile?.status ?? "DRAFT"}
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">

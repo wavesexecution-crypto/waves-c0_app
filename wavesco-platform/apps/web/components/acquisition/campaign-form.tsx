@@ -4,17 +4,28 @@ import { useActionState, useEffect, useState, useTransition } from "react";
 import { createCampaignAction, type ActionState } from "@/lib/actions/acquisition";
 import { computeEligibilityAction } from "@/lib/actions/campaigns";
 
-const initial: ActionState = { ok: false };
+const initialAction: ActionState = { ok: false };
 
 export function CampaignCreateForm({
   cities,
   categories,
+  initial,
 }: {
   cities: string[];
   categories: string[];
+  initial?: { name?: string; location?: string; category?: string; tier?: string };
 }) {
-  const [state, formAction, pending] = useActionState(createCampaignAction, initial);
-  const [filters, setFilters] = useState<{ location?: string; category?: string; tier?: string }>({});
+  const [state, formAction, pending] = useActionState(createCampaignAction, initialAction);
+  // Prefill (e.g. "run again" from a previous campaign) only applies values
+  // that still exist in the live facets — stale values fall back to "all".
+  const initialLocation = initial?.location && cities.includes(initial.location) ? initial.location : undefined;
+  const initialCategory = initial?.category && categories.includes(initial.category) ? initial.category : undefined;
+  const initialTier = initial?.tier === "A" || initial?.tier === "B" || initial?.tier === "C" ? initial.tier : undefined;
+  const [filters, setFilters] = useState<{ location?: string; category?: string; tier?: string }>({
+    location: initialLocation,
+    category: initialCategory,
+    tier: initialTier,
+  });
   const [eligibility, setEligibility] = useState<Awaited<ReturnType<typeof computeEligibilityAction>> | null>(null);
   const [loading, startTransition] = useTransition();
 
@@ -44,11 +55,11 @@ export function CampaignCreateForm({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Campaign name *
-          <input name="name" required minLength={2} maxLength={80} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]" />
+          <input name="name" required minLength={2} maxLength={80} defaultValue={initial?.name ?? ""} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]" />
         </label>
         <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Location / city
-          <select name="location" defaultValue="" className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
+          <select name="location" defaultValue={initialLocation ?? ""} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
             <option value="">All locations</option>
             {cities.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -57,7 +68,7 @@ export function CampaignCreateForm({
         </label>
         <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Category
-          <select name="category" defaultValue="" className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
+          <select name="category" defaultValue={initialCategory ?? ""} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
             <option value="">All categories</option>
             {categories.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -66,7 +77,7 @@ export function CampaignCreateForm({
         </label>
         <label className="font-sans text-[13px] leading-5 text-muted-foreground">
           Lead tier
-          <select name="tier" defaultValue="all" className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
+          <select name="tier" defaultValue={initialTier ?? "all"} className="mt-1 w-full rounded-lg border border-border/80 bg-transparent px-2 py-1.5 font-sans text-[13px]">
             <option value="all">All tiers</option>
             <option value="A">Tier A</option>
             <option value="B">Tier B</option>

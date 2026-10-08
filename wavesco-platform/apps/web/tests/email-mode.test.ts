@@ -63,7 +63,7 @@ describe("email operating mode", () => {
       expect(label.length).toBeGreaterThan(0);
       expect(label.toLowerCase()).not.toMatch(/n8n|brevo|smtp|relay|outbox/);
     }
-    expect(emailModeLabel("waves_managed")).toMatch(/waves/i);
-    expect(emailModeLabel("client_managed")).toMatch(/our email/i);
+    expect(emailModeLabel("waves_managed")).toMatch(/waves handles it/i);
+    expect(emailModeLabel("client_managed")).toMatch(/connect my email/i);
   });
 });

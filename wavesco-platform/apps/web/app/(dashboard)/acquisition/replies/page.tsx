@@ -67,13 +67,20 @@ export default async function RepliesPage({
         <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Acquisition OS</p>
         <h1 className="text-2xl font-semibold tracking-tight">Replies</h1>
         <p className="text-sm text-muted-foreground">
-          Every inbound reply, bounce and unsubscribe in one place — {openCount} awaiting response · {repliedCount} replied.
-          Threads are written by reply ingestion and reconciliation; nothing here is fabricated.
+          Every inbound reply, bounce and unsubscribe in one place — {openCount} waiting for a reply · {repliedCount} replied.
+          Every reply is saved automatically — nothing is lost, nothing is made up.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs">
-        {["all", "OPEN", "REPLIED", "POSITIVE", "UNSUBSCRIBED", "BOUNCED"].map((s) => (
+        {([
+          { value: "all", label: "All" },
+          { value: "OPEN", label: "Waiting for reply" },
+          { value: "REPLIED", label: "Replied" },
+          { value: "POSITIVE", label: "Positive" },
+          { value: "UNSUBSCRIBED", label: "Not interested" },
+          { value: "BOUNCED", label: "Bounced" },
+        ] as { value: string; label: string }[]).map(({ value: s, label }) => (
           <Link
             key={s}
             href={s === "all" ? "/acquisition/replies" : `/acquisition/replies?status=${s}`}
@@ -83,7 +90,7 @@ export default async function RepliesPage({
                 : "border-line text-muted-foreground hover:bg-accent"
             }`}
           >
-            {s === "all" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
+            {label}
           </Link>
         ))}
       </div>
@@ -92,11 +99,11 @@ export default async function RepliesPage({
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="text-sm font-medium">No conversations yet</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Threads appear here when prospects reply, bounce, or unsubscribe — via reply ingestion or the next reconciliation.
-            Replies are entered automatically; you never need to copy them anywhere by hand.
+            Threads appear here as soon as prospects reply, bounce, or ask not to be contacted.
+            Replies are saved automatically; you never need to copy them anywhere by hand.
           </p>
-          <Link href="/acquisition/pipeline" className="mt-4 inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm hover:bg-accent">
-            Go to Pipeline
+          <Link href="/acquisition/outreach" className="mt-4 inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm hover:bg-accent">
+            See your outreach
           </Link>
         </div>
       ) : (
@@ -147,6 +154,11 @@ export default async function RepliesPage({
                   <Link href={`/acquisition/leads/${encodeURIComponent(thread.conv.leadKey)}`} className="rounded-md border px-3 py-1.5 hover:bg-accent">
                     Open lead
                   </Link>
+                  {thread.conv.status === "OPEN" && (
+                    <Link href="/acquisition/follow-ups" className="rounded-md border px-3 py-1.5 hover:bg-accent">
+                      No reply yet — leave it, or try again with a follow-up →
+                    </Link>
+                  )}
                   {(thread.conv.status === "REPLIED" || thread.conv.status === "POSITIVE") && (
                     <span className="rounded-md border border-dashed px-3 py-1.5 text-muted-foreground">
                       Respond personally, then record MEETING / WON / LOST on the lead

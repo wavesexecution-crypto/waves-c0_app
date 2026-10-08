@@ -31,30 +31,32 @@ function modeState(mode: EmailMode): ModeState {
   return mode === "waves_managed"
     ? {
         mode,
-        label: "Waves handles email",
+        label: "WAVES handles it",
         status: "active",
         description:
-          "Waves manages the email infrastructure for your acquisition campaigns. Nothing for you to configure.",
+          "WAVES sends your outreach for you. Nothing for you to configure.",
       }
     : {
         mode,
-        label: "Use our email system",
+        label: "Connect my email",
         status: "setup_pending",
         description:
-          "We've recorded that you want your own mailbox used. A Waves specialist will connect it with you — until then your campaigns keep sending through Waves-managed email.",
+          "We've recorded that you want your own mailbox used. A Waves specialist will connect it with you — until then your campaigns keep sending through WAVES-managed email.",
       };
 }
 
-const CARDS: { mode: EmailMode; title: string; subtitle: string }[] = [
+const CARDS: { mode: EmailMode; title: string; subtitle: string; cta: string }[] = [
   {
     mode: "client_managed",
-    title: "Use our email system",
-    subtitle: "Connect your company's existing mailbox. A Waves specialist will set it up with you.",
+    title: "Connect my email",
+    subtitle: "Send outreach from your existing business email.",
+    cta: "Connect email →",
   },
   {
     mode: "waves_managed",
-    title: "Have Waves handle it",
-    subtitle: "Waves manages the email infrastructure for your campaigns. Nothing for you to configure.",
+    title: "Have WAVES handle it",
+    subtitle: "WAVES sends your outreach for you. Nothing for you to configure.",
+    cta: "Set up WAVES →",
   },
 ];
 
@@ -99,10 +101,9 @@ export function EmailModeSelector({ initialMode }: { initialMode: EmailMode }) {
     <section className="rounded-lg border border-border/80 bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-sans text-[13px] font-semibold">How should Acquisition OS handle email?</h2>
+          <h2 className="font-sans text-[13px] font-semibold">Your choice</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Your choice decides how campaign emails are sent. Either way, sending only
-            happens after you approve a campaign.
+            Pick one. Either way, sending only happens after you approve a campaign.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -138,6 +139,7 @@ export function EmailModeSelector({ initialMode }: { initialMode: EmailMode }) {
                 ) : null}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{c.subtitle}</p>
+              <p className="mt-2 text-xs font-medium text-foreground">{c.cta}</p>
               {saving === c.mode ? (
                 <p className="mt-2 text-[11px] text-muted-foreground">Saving…</p>
               ) : null}

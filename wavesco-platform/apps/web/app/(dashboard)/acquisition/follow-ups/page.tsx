@@ -28,8 +28,7 @@ export default async function FollowUpsPage() {
         <div>
           <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">Follow-ups</h1>
           <p className="mt-1 max-w-3xl font-sans text-[13px] leading-5 text-muted-foreground">
-            <span className="font-mono tabular-nums text-foreground">{pending.length}</span> pending · <span className="font-mono tabular-nums text-foreground">{overdue.length}</span> overdue. Reminders flow through the existing
-            Notify Hub when triggered by automations; this tracker is the source of record.
+            <span className="font-mono tabular-nums text-foreground">{pending.length}</span> pending · <span className="font-mono tabular-nums text-foreground">{overdue.length}</span> overdue. Nudges you've scheduled for prospects who haven't replied — work them from here.
           </p>
         </div>
         <AutoRefresh intervalMs={10_000} />
